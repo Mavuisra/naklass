@@ -1,0 +1,458 @@
+/*
+ * Styles CSS pour le module de profil utilisateur
+ * Naklass - Système de Gestion Scolaire
+ */
+
+/* Variables CSS spécifiques au profil */
+:root {
+    --profile-photo-size: 120px;
+    --profile-photo-border: 4px solid var(--naklass-primary);
+    --profile-shadow: 0 4px 6px rgba(0, 119, 182, 0.1);
+    --profile-hover-shadow: 0 8px 25px rgba(0, 119, 182, 0.15);
+}
+
+/* ===== PHOTO DE PROFIL ===== */
+.profile-photo-container {
+    position: relative;
+    display: inline-block;
+    margin: 0 auto;
+}
+
+.profile-photo {
+    width: var(--profile-photo-size);
+    height: var(--profile-photo-size);
+    border-radius: 50%;
+    object-fit: cover;
+    border: var(--profile-photo-border);
+    box-shadow: var(--profile-shadow);
+    transition: all 0.3s ease;
+}
+
+.profile-photo:hover {
+    transform: scale(1.05);
+    box-shadow: var(--profile-hover-shadow);
+}
+
+.profile-photo-placeholder {
+    width: var(--profile-photo-size);
+    height: var(--profile-photo-size);
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--naklass-primary), var(--naklass-primary-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 3rem;
+    border: var(--profile-photo-border);
+    box-shadow: var(--profile-shadow);
+    transition: all 0.3s ease;
+}
+
+.profile-photo-placeholder:hover {
+    transform: scale(1.05);
+    box-shadow: var(--profile-hover-shadow);
+}
+
+/* ===== CARDS ET CONTENEURS ===== */
+.card {
+    transition: all 0.3s ease;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    border-bottom: none;
+    padding: 1.25rem 1.5rem;
+    font-weight: 600;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* En-têtes avec couleurs Naklass */
+.card-header.bg-naklass-primary {
+    background: linear-gradient(135deg, var(--naklass-primary), var(--naklass-primary-dark)) !important;
+}
+
+/* ===== FORMULAIRES ===== */
+.form-label {
+    font-weight: 600;
+    color: var(--naklass-dark);
+    margin-bottom: 0.5rem;
+}
+
+.form-control {
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    padding: 0.75rem 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: var(--naklass-primary);
+    box-shadow: 0 0 0 0.2rem rgba(0, 119, 182, 0.15);
+    transform: translateY(-1px);
+}
+
+.form-control-plaintext {
+    padding: 0.75rem 0;
+    font-weight: 500;
+    color: var(--naklass-dark);
+}
+
+.input-group-text {
+    background: var(--naklass-light);
+    border: 2px solid #e9ecef;
+    color: var(--naklass-primary);
+    font-weight: 600;
+}
+
+/* ===== BADGES ET STATUS ===== */
+.badge {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 6px;
+}
+
+.badge.bg-naklass-primary {
+    background: linear-gradient(135deg, var(--naklass-primary), var(--naklass-primary-dark)) !important;
+}
+
+/* ===== BOUTONS ===== */
+.btn {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-naklass {
+    background: linear-gradient(135deg, var(--naklass-primary), var(--naklass-primary-dark));
+    color: white;
+    border: 2px solid var(--naklass-primary);
+}
+
+.btn-naklass:hover {
+    background: linear-gradient(135deg, var(--naklass-primary-dark), var(--naklass-primary));
+    color: white;
+    border-color: var(--naklass-primary-dark);
+}
+
+.btn-outline-naklass {
+    color: var(--naklass-primary);
+    border: 2px solid var(--naklass-primary);
+    background: transparent;
+}
+
+.btn-outline-naklass:hover {
+    background: var(--naklass-primary);
+    border-color: var(--naklass-primary);
+    color: white;
+}
+
+/* ===== ALERTES ===== */
+.alert {
+    border-radius: 10px;
+    border: none;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    font-weight: 500;
+}
+
+.alert-success {
+    background: linear-gradient(135deg, #d4edda, #c3e6cb);
+    color: #155724;
+}
+
+.alert-danger {
+    background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+    color: #721c24;
+}
+
+.alert-info {
+    background: linear-gradient(135deg, rgba(0, 119, 182, 0.1), rgba(0, 119, 182, 0.05));
+    color: var(--naklass-primary);
+    border: 2px solid rgba(0, 119, 182, 0.2);
+}
+
+.alert-warning {
+    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+    color: #856404;
+}
+
+/* ===== PROGRESS BAR (pour la force du mot de passe) ===== */
+.progress {
+    border-radius: 4px;
+    overflow: hidden;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    transition: all 0.3s ease;
+}
+
+/* ===== ICÔNES ET COULEURS ===== */
+.text-naklass-primary {
+    color: var(--naklass-primary) !important;
+}
+
+.text-naklass-dark {
+    color: var(--naklass-dark) !important;
+}
+
+.bg-naklass-light {
+    background-color: rgba(0, 119, 182, 0.05) !important;
+}
+
+/* ===== ANIMATIONS ET TRANSITIONS ===== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 119, 182, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(0, 119, 182, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 119, 182, 0);
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.pulse-animation {
+    animation: pulse 2s infinite;
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+@media (max-width: 768px) {
+    :root {
+        --profile-photo-size: 100px;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .main-content {
+        padding: 1rem;
+    }
+    
+    .d-flex.justify-content-between {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .btn-group {
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        flex: 1;
+    }
+}
+
+@media (max-width: 576px) {
+    :root {
+        --profile-photo-size: 80px;
+    }
+    
+    .profile-photo-placeholder {
+        font-size: 2rem;
+    }
+    
+    .card-header h5,
+    .card-header h6 {
+        font-size: 1rem;
+    }
+    
+    .alert {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+    }
+}
+
+/* ===== ACCESSIBILITÉ ===== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ===== FOCUS ET STATES ===== */
+.btn:focus,
+.form-control:focus {
+    outline: 2px solid var(--naklass-primary);
+    outline-offset: 2px;
+}
+
+/* Disabled states */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* ===== UTILS SPÉCIFIQUES AU PROFIL ===== */
+.profile-info-item {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.profile-info-item:last-child {
+    border-bottom: none;
+}
+
+.profile-stat {
+    text-align: center;
+    padding: 1rem;
+    border-radius: 8px;
+    background: var(--naklass-light);
+    transition: all 0.3s ease;
+}
+
+.profile-stat:hover {
+    background: rgba(0, 119, 182, 0.1);
+    transform: translateY(-2px);
+}
+
+.profile-stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--naklass-primary);
+    display: block;
+}
+
+.profile-stat-label {
+    font-size: 0.9rem;
+    color: var(--naklass-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+/* ===== SÉCURITÉ ET VALIDATION ===== */
+.security-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.security-indicator.secure {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+}
+
+.security-indicator.warning {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.security-indicator.danger {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+/* ===== UPLOAD DE FICHIER ===== */
+.file-upload-zone {
+    border: 2px dashed var(--naklass-primary);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    background: rgba(0, 119, 182, 0.05);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.file-upload-zone:hover {
+    border-color: var(--naklass-primary-dark);
+    background: rgba(0, 119, 182, 0.1);
+}
+
+.file-upload-zone.dragover {
+    border-color: var(--naklass-primary-dark);
+    background: rgba(0, 119, 182, 0.15);
+    transform: scale(1.02);
+}
+
+/* ===== TOOLTIPS PERSONNALISÉS ===== */
+.tooltip-naklass {
+    position: relative;
+    cursor: help;
+}
+
+.tooltip-naklass::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--naklass-dark);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.tooltip-naklass::before {
+    content: '';
+    position: absolute;
+    bottom: 115%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--naklass-dark);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.tooltip-naklass:hover::after,
+.tooltip-naklass:hover::before {
+    opacity: 1;
+    visibility: visible;
+}

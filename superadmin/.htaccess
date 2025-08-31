@@ -1,0 +1,106 @@
+# Protection du dossier Super Administrateur
+# Décommentez et adaptez selon vos besoins de sécurité
+
+# ===== PROTECTION PAR IP (DÉCOMMENTEZ ET ADAPTEZ) =====
+# Restriction d'accès par adresses IP spécifiques
+# <RequireAll>
+#     # Remplacez par vos IP autorisées
+#     Require ip 127.0.0.1
+#     Require ip 192.168.1.0/24
+#     Require ip 10.0.0.0/8
+# </RequireAll>
+
+# ===== PROTECTION CONTRE L'ÉNUMÉRATION =====
+# Désactiver l'affichage du contenu des dossiers
+Options -Indexes
+
+# Masquer les fichiers sensibles
+<Files "*.log">
+    Require all denied
+</Files>
+
+<Files "*.sql">
+    Require all denied
+</Files>
+
+<Files "*.bak">
+    Require all denied
+</Files>
+
+# ===== HEADERS DE SÉCURITÉ =====
+<IfModule mod_headers.c>
+    # Protection contre le clickjacking
+    Header always append X-Frame-Options DENY
+    
+    # Protection XSS
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # Prévention du sniffing MIME
+    Header always set X-Content-Type-Options nosniff
+    
+    # Politique de référent stricte
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Content Security Policy (adaptez selon vos besoins)
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' cdn.jsdelivr.net; img-src 'self' data:; font-src 'self' cdn.jsdelivr.net"
+</IfModule>
+
+# ===== LIMITATION DU DÉBIT =====
+# Protection contre les attaques par force brute (si mod_evasive est disponible)
+<IfModule mod_evasive24.c>
+    DOSHashTableSize    3097
+    DOSPageCount        2
+    DOSPageInterval     1
+    DOSSiteCount        20
+    DOSSiteInterval     1
+    DOSBlockingPeriod   600
+</IfModule>
+
+# ===== CACHE ET PERFORMANCE =====
+# Désactiver le cache pour les pages sensibles
+<IfModule mod_headers.c>
+    Header always set Cache-Control "no-cache, no-store, must-revalidate"
+    Header always set Pragma "no-cache"
+    Header always set Expires "Thu, 01 Jan 1970 00:00:00 GMT"
+</IfModule>
+
+# ===== LOG PERSONNALISÉ =====
+# Log spécifique pour le Super Admin (si nécessaire)
+# LogFormat "%h %l %u %t \"%r\" %>s %O \"%{Referer}i\" \"%{User-Agent}i\"" superadmin
+# CustomLog /path/to/superadmin.log superadmin
+
+# ===== REDIRECTION HTTPS =====
+# Forcer HTTPS (décommentez en production)
+# <IfModule mod_rewrite.c>
+#     RewriteEngine On
+#     RewriteCond %{HTTPS} off
+#     RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
+
+# ===== AUTHENTIFICATION SUPPLÉMENTAIRE =====
+# Authentification HTTP Basic en plus (double sécurité)
+# Décommentez et créez le fichier .htpasswd
+# AuthType Basic
+# AuthName "Zone Super Administrateur - Accès Restreint"
+# AuthUserFile /path/to/.htpasswd
+# Require valid-user
+
+# ===== INSTRUCTIONS DE CONFIGURATION =====
+# Ce fichier contient des mesures de sécurité pour le dossier Super Admin.
+# 
+# IMPORTANTES :
+# 1. Adaptez les restrictions IP à votre environnement
+# 2. En production, activez HTTPS obligatoire
+# 3. Considérez l'authentification HTTP Basic supplémentaire
+# 4. Surveillez les logs d'accès régulièrement
+# 5. Testez les configurations avant la mise en production
+#
+# POUR ACTIVER LES RESTRICTIONS IP :
+# - Décommentez la section "PROTECTION PAR IP"
+# - Remplacez les IP d'exemple par vos IP réelles
+# - Redémarrez Apache
+#
+# POUR L'AUTHENTIFICATION HTTP BASIC :
+# - Créez un fichier .htpasswd : htpasswd -c .htpasswd superadmin
+# - Décommentez la section "AUTHENTIFICATION SUPPLÉMENTAIRE"
+# - Adaptez le chemin vers .htpasswd

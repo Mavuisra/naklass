@@ -1,0 +1,254 @@
+/**
+ * Thème Naklass - Couleur de base #0077b6
+ * Palette de couleurs personnalisée pour Naklass
+ */
+
+:root {
+    /* Couleurs principales basées sur #0077b6 */
+    --naklass-primary: #0077b6;
+    --naklass-primary-dark: #005577;
+    --naklass-primary-darker: #004466;
+    --naklass-primary-light: #0088cc;
+    --naklass-primary-lighter: #3399dd;
+    
+    /* Couleurs avec transparence */
+    --naklass-primary-10: rgba(0, 119, 182, 0.1);
+    --naklass-primary-20: rgba(0, 119, 182, 0.2);
+    --naklass-primary-25: rgba(0, 119, 182, 0.25);
+    --naklass-primary-30: rgba(0, 119, 182, 0.3);
+    --naklass-primary-50: rgba(0, 119, 182, 0.5);
+    --naklass-primary-80: rgba(0, 119, 182, 0.8);
+    
+    /* Gradients personnalisés */
+    --naklass-gradient-primary: linear-gradient(135deg, var(--naklass-primary) 0%, var(--naklass-primary-dark) 100%);
+    --naklass-gradient-primary-light: linear-gradient(135deg, var(--naklass-primary-light) 0%, var(--naklass-primary) 100%);
+    --naklass-gradient-primary-reverse: linear-gradient(135deg, var(--naklass-primary-dark) 0%, var(--naklass-primary) 100%);
+    
+    /* Couleurs complémentaires */
+    --naklass-orange: #ff8500;
+    --naklass-orange-light: #ffa940;
+    --naklass-gray: #6c757d;
+    --naklass-gray-light: #adb5bd;
+    --naklass-gray-lighter: #e9ecef;
+    
+    /* États et statuts */
+    --naklass-success: #28a745;
+    --naklass-warning: #ffc107;
+    --naklass-danger: #dc3545;
+    --naklass-info: var(--naklass-primary-light);
+}
+
+/* Classes utilitaires pour la couleur de base */
+.bg-naklass-primary {
+    background-color: var(--naklass-primary) !important;
+}
+
+.bg-naklass-gradient {
+    background: var(--naklass-gradient-primary) !important;
+}
+
+.text-naklass-primary {
+    color: var(--naklass-primary) !important;
+}
+
+.border-naklass-primary {
+    border-color: var(--naklass-primary) !important;
+}
+
+/* Boutons avec le thème Naklass */
+.btn-naklass {
+    background: var(--naklass-gradient-primary);
+    border: none;
+    color: white;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-naklass:hover {
+    background: var(--naklass-gradient-primary-reverse);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px var(--naklass-primary-30);
+    color: white;
+}
+
+.btn-outline-naklass {
+    border: 2px solid var(--naklass-primary);
+    color: var(--naklass-primary);
+    background: transparent;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-outline-naklass:hover {
+    background: var(--naklass-primary);
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Cards avec thème Naklass */
+.card-naklass {
+    border: 1px solid var(--naklass-primary-20);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.card-naklass:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px var(--naklass-primary-20);
+}
+
+.card-naklass .card-header {
+    background: var(--naklass-gradient-primary);
+    color: white;
+    border-bottom: none;
+}
+
+/* Navigation avec thème Naklass */
+.nav-naklass .nav-link {
+    color: var(--naklass-gray);
+    transition: all 0.3s ease;
+}
+
+.nav-naklass .nav-link:hover,
+.nav-naklass .nav-link.active {
+    color: var(--naklass-primary);
+    border-bottom: 2px solid var(--naklass-primary);
+}
+
+/* Formulaires avec thème Naklass */
+.form-naklass .form-control:focus {
+    border-color: var(--naklass-primary);
+    box-shadow: 0 0 0 0.2rem var(--naklass-primary-25);
+}
+
+.form-naklass .form-check-input:checked {
+    background-color: var(--naklass-primary);
+    border-color: var(--naklass-primary);
+}
+
+/* Alerts avec thème Naklass */
+.alert-naklass {
+    background: var(--naklass-primary-10);
+    border: 1px solid var(--naklass-primary-30);
+    border-left: 4px solid var(--naklass-primary);
+    color: var(--naklass-primary-dark);
+}
+
+/* Badges avec thème Naklass */
+.badge-naklass {
+    background: var(--naklass-gradient-primary);
+    color: white;
+}
+
+.badge-outline-naklass {
+    border: 1px solid var(--naklass-primary);
+    color: var(--naklass-primary);
+    background: transparent;
+}
+
+/* Progress bars avec thème Naklass */
+.progress-naklass .progress-bar {
+    background: var(--naklass-gradient-primary);
+}
+
+/* Tables avec thème Naklass */
+.table-naklass thead th {
+    background: var(--naklass-gradient-primary);
+    color: white;
+    border: none;
+}
+
+.table-naklass tbody tr:hover {
+    background: var(--naklass-primary-10);
+}
+
+/* Sidebar avec thème Naklass */
+.sidebar-naklass {
+    background: var(--naklass-gradient-primary);
+}
+
+.sidebar-naklass .sidebar-menu .menu-link.active {
+    background: var(--naklass-primary-20);
+    border-left: 3px solid var(--naklass-orange);
+}
+
+/* Icônes avec thème Naklass */
+.icon-naklass {
+    color: var(--naklass-primary);
+}
+
+.icon-naklass-light {
+    color: var(--naklass-primary-light);
+}
+
+/* Animations spéciales */
+@keyframes naklass-pulse {
+    0% { box-shadow: 0 0 0 0 var(--naklass-primary-50); }
+    70% { box-shadow: 0 0 0 10px var(--naklass-primary-10); }
+    100% { box-shadow: 0 0 0 0 var(--naklass-primary-10); }
+}
+
+.pulse-naklass {
+    animation: naklass-pulse 2s infinite;
+}
+
+/* Effets hover spéciaux */
+.hover-naklass {
+    transition: all 0.3s ease;
+}
+
+.hover-naklass:hover {
+    color: var(--naklass-primary);
+    transform: scale(1.05);
+}
+
+/* Scrollbar personnalisée avec thème Naklass */
+.scrollbar-naklass::-webkit-scrollbar {
+    width: 8px;
+}
+
+.scrollbar-naklass::-webkit-scrollbar-track {
+    background: var(--naklass-gray-lighter);
+}
+
+.scrollbar-naklass::-webkit-scrollbar-thumb {
+    background: var(--naklass-gradient-primary);
+    border-radius: 4px;
+}
+
+.scrollbar-naklass::-webkit-scrollbar-thumb:hover {
+    background: var(--naklass-gradient-primary-reverse);
+}
+
+/* Classes pour les états */
+.loading-naklass {
+    position: relative;
+    overflow: hidden;
+}
+
+.loading-naklass::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, var(--naklass-primary-20), transparent);
+    animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* Mode sombre avec thème Naklass */
+@media (prefers-color-scheme: dark) {
+    .theme-naklass-dark {
+        --naklass-primary: #0088cc;
+        --naklass-primary-dark: #0077b6;
+        --naklass-bg: #1a1a1a;
+        --naklass-text: #e9ecef;
+    }
+}

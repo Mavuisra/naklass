@@ -1,0 +1,34 @@
+{
+    "name": "naklass/school-management",
+    "description": "Système de gestion scolaire Naklass",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "phpmailer/phpmailer": "^6.10"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Naklass\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Naklass\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "mkdir -p logs",
+            "chmod 755 logs"
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
