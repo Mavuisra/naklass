@@ -23,12 +23,15 @@ try {
         
         $query = "SELECT e.*, ec.nom_ecole as ecole_nom, ec.adresse as ecole_adresse, ec.logo_path as logo_url, ec.directeur_nom,
                          ec.type_etablissement, ec.devise_principale, ec.description_etablissement,
-                         i.date_inscription, c.nom_classe as classe_nom, c.niveau, c.niveau_detaille
+                         i.date_inscription, i.annee_scolaire, i.statut_inscription,
+                         c.nom_classe as classe_nom, c.niveau, c.niveau_detaille, c.cycle, c.option_section
                   FROM eleves e
                   JOIN ecoles ec ON e.ecole_id = ec.id
-                  LEFT JOIN inscriptions i ON e.id = i.eleve_id AND i.statut = 'validée'
+                  LEFT JOIN inscriptions i ON e.id = i.eleve_id AND i.statut_inscription IN ('validée', 'en_cours')
                   LEFT JOIN classes c ON i.classe_id = c.id
-                  WHERE e.id = :id AND e.ecole_id = :ecole_id";
+                  WHERE e.id = :id AND e.ecole_id = :ecole_id
+                  ORDER BY i.created_at DESC
+                  LIMIT 1";
         
         $stmt = $db->prepare($query);
         $stmt->execute([
@@ -51,10 +54,11 @@ try {
         
         $query = "SELECT e.*, ec.nom_ecole as ecole_nom, ec.adresse as ecole_adresse, ec.logo_path as logo_url, ec.directeur_nom,
                          ec.type_etablissement, ec.devise_principale, ec.description_etablissement,
-                         i.date_inscription, c.nom_classe as classe_nom, c.niveau, c.niveau_detaille
+                         i.date_inscription, i.annee_scolaire, i.statut_inscription,
+                         c.nom_classe as classe_nom, c.niveau, c.niveau_detaille, c.cycle, c.option_section
                   FROM eleves e
                   JOIN ecoles ec ON e.ecole_id = ec.id
-                  JOIN inscriptions i ON e.id = i.eleve_id AND i.statut = 'validée'
+                  JOIN inscriptions i ON e.id = i.eleve_id AND i.statut_inscription IN ('validée', 'en_cours')
                   JOIN classes c ON i.classe_id = c.id
                   WHERE c.id = :class_id AND e.ecole_id = :ecole_id
                   ORDER BY e.nom, e.prenom";
@@ -83,10 +87,11 @@ try {
         $placeholders = str_repeat('?,', count($ids) - 1) . '?';
         $query = "SELECT e.*, ec.nom_ecole as ecole_nom, ec.adresse as ecole_adresse, ec.logo_path as logo_url, ec.directeur_nom,
                          ec.type_etablissement, ec.devise_principale, ec.description_etablissement,
-                         i.date_inscription, c.nom_classe as classe_nom, c.niveau, c.niveau_detaille
+                         i.date_inscription, i.annee_scolaire, i.statut_inscription,
+                         c.nom_classe as classe_nom, c.niveau, c.niveau_detaille, c.cycle, c.option_section
                   FROM eleves e
                   JOIN ecoles ec ON e.ecole_id = ec.id
-                  LEFT JOIN inscriptions i ON e.id = i.eleve_id AND i.statut = 'validée'
+                  LEFT JOIN inscriptions i ON e.id = i.eleve_id AND i.statut_inscription IN ('validée', 'en_cours')
                   LEFT JOIN classes c ON i.classe_id = c.id
                   WHERE e.id IN ($placeholders) AND e.ecole_id = :ecole_id
                   ORDER BY e.nom, e.prenom";
@@ -123,25 +128,56 @@ function getStudentCardPhotoPath($eleve) {
     
     // Si l'élève a une photo dans la base de données
     if (!empty($eleve['photo_path'])) {
-        // Essayer d'abord le chemin avec PHOTO_CONFIG
-        $photo_path = '../' . PHOTO_CONFIG['UPLOAD_DIR'] . $eleve['photo_path'];
-        if (file_exists($photo_path)) {
-            return $photo_path;
-        }
-        
-        // Essayer le chemin direct dans uploads/students
-        $photo_path = '../uploads/students/' . $eleve['photo_path'];
-        if (file_exists($photo_path)) {
-            return $photo_path;
+        // Vérifier si le photo_path contient déjà un chemin complet
+        if (strpos($eleve['photo_path'], 'uploads/') === 0) {
+            // Le chemin est déjà complet, ajouter juste ../
+            $photo_path = '../' . $eleve['photo_path'];
+            if (file_exists($photo_path)) {
+                return $photo_path;
+            }
+        } else {
+            // Le chemin est juste le nom du fichier, construire le chemin complet
+            // CORRECTION: Les photos sont dans students/uploads/students/photos/
+            // Depuis students/generate_card.php, le chemin relatif est uploads/students/photos/
+            $photo_path = 'uploads/students/photos/' . $eleve['photo_path'];
+            if (file_exists($photo_path)) {
+                return $photo_path;
+            }
+            
+            // Essayer le chemin avec PHOTO_CONFIG
+            $photo_path = '../' . PHOTO_CONFIG['UPLOAD_DIR'] . $eleve['photo_path'];
+            if (file_exists($photo_path)) {
+                return $photo_path;
+            }
+            
+            // Essayer le chemin direct dans uploads/students/photos
+            $photo_path = '../uploads/students/photos/' . $eleve['photo_path'];
+            if (file_exists($photo_path)) {
+                return $photo_path;
+            }
+            
+            // Essayer le chemin direct dans uploads/students
+            $photo_path = '../uploads/students/' . $eleve['photo_path'];
+            if (file_exists($photo_path)) {
+                return $photo_path;
+            }
         }
     }
     
     // Essayer les anciens chemins pour compatibilité
     $photo_paths = [
+        '../uploads/students/photos/' . $eleve['id'] . '.jpg',
+        '../uploads/students/photos/' . $eleve['id'] . '.png',
+        '../uploads/students/photos/' . $eleve['id'] . '.jpeg',
+        '../uploads/students/photos/' . $eleve['matricule'] . '.jpg',
+        '../uploads/students/photos/' . $eleve['matricule'] . '.png',
+        '../uploads/students/photos/' . $eleve['matricule'] . '.jpeg',
         '../uploads/students/' . $eleve['id'] . '.jpg',
         '../uploads/students/' . $eleve['id'] . '.png',
+        '../uploads/students/' . $eleve['id'] . '.jpeg',
         '../uploads/students/' . $eleve['matricule'] . '.jpg',
-        '../uploads/students/' . $eleve['matricule'] . '.png'
+        '../uploads/students/' . $eleve['matricule'] . '.png',
+        '../uploads/students/' . $eleve['matricule'] . '.jpeg'
     ];
     
     foreach ($photo_paths as $path) {
@@ -151,7 +187,8 @@ function getStudentCardPhotoPath($eleve) {
     }
     
     // Photo par défaut avec l'initiale de l'élève
-    return 'https://ui-avatars.com/api/?name=' . urlencode($eleve['prenom'] . '+' . $eleve['nom']) . '&background=667eea&color=fff&size=200';
+    $initials = strtoupper(substr($eleve['prenom'], 0, 1) . substr($eleve['nom'], 0, 1));
+    return 'https://ui-avatars.com/api/?name=' . urlencode($initials) . '&background=007BFF&color=fff&size=200&bold=true';
 }
 
 // Fonction pour récupérer les informations des tuteurs
@@ -201,6 +238,8 @@ $page_title = count($eleves) > 1 ?
     <title><?php echo htmlspecialchars($page_title); ?> - Naklass</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
@@ -208,45 +247,46 @@ $page_title = count($eleves) > 1 ?
     <style>
         /* Variables CSS pour la cohérence et l'édition */
         :root {
-            --card-width: 320px;
-            --card-height: 200px;
+            --card-width: 450px;
+            --card-height: 380px;
             --card-radius: 16px;
-            --primary-gradient: linear-gradient(135deg, #667eea 0%,rgb(25, 88, 176) 100%);
-            --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            --warning-gradient: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-            --danger-gradient: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-            --info-gradient: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-            --card-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
-            --card-shadow-hover: 0 25px 50px rgba(0, 0, 0, 0.3);
+            --primary-color: #007BFF;
+            --primary-dark: #0056b3;
+            --card-shadow: 0 6px 14px rgba(0,0,0,0.12);
+            --card-shadow-hover: 0 8px 20px rgba(0,0,0,0.15);
         }
 
         body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background-color:rgb(205, 205, 205);
             min-height: 100vh;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Montserrat', sans-serif;
         }
 
         /* Carte d'étudiant moderne et éditable */
         .student-card {
             width: var(--card-width);
             height: var(--card-height);
-            background: var(--primary-gradient);
+            background: #fff;
             border-radius: var(--card-radius);
             position: relative;
-            color: white;
+            color: #333;
             overflow: hidden;
             box-shadow: var(--card-shadow);
             margin: 15px;
+            margin-bottom: 0;
             display: inline-block;
             vertical-align: top;
             transition: all 0.3s ease;
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            border: 3px solid var(--primary-color);
             cursor: pointer;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         .student-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-3px);
             box-shadow: var(--card-shadow-hover);
         }
 
@@ -345,17 +385,18 @@ $page_title = count($eleves) > 1 ?
         }
 
         /* Motifs d'arrière-plan de l'école */
-        .school-patterns {
+        /* Filigrane discret */
+        .student-card::before {
+            content: attr(data-school-name);
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 1;
-            opacity: 0.1;
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
+            top: 30%;
+            left: -20%;
+            font-size: 60px;
+            font-weight: 700;
+            color: rgba(0,123,255,0.05);
+            transform: rotate(-25deg);
+            white-space: nowrap;
+            z-index: 0;
         }
 
         .pattern-overlay {
@@ -367,147 +408,20 @@ $page_title = count($eleves) > 1 ?
             background: rgba(0, 0, 0, 0.3);
         }
 
-        /* Section des tuteurs */
-        .tutors-section {
-            position: relative;
-            z-index: 2;
-            margin: 8px 12px;
-            padding: 8px 12px;
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
 
-        .tutors-header {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            margin-bottom: 6px;
-            font-size: 9px;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.9);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
 
-        .tutors-list {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
 
-        .tutor-item {
-            padding: 4px 8px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.2s ease;
-        }
 
-        .tutor-item.principal {
-            background: rgba(255, 215, 0, 0.2);
-            border-color: rgba(255, 215, 0, 0.4);
-        }
 
-        .tutor-info {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .tutor-name {
-            font-size: 8px;
-            font-weight: 600;
-            color: white;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .badge-principal {
-            background: rgba(255, 215, 0, 0.8);
-            color: #333;
-            padding: 1px 4px;
-            border-radius: 4px;
-            font-size: 6px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .tutor-details {
-            display: flex;
-            flex-direction: column;
-            gap: 1px;
-        }
-
-        .tutor-relation {
-            font-size: 7px;
-            color: rgba(255, 255, 255, 0.8);
-            font-style: italic;
-        }
-
-        .tutor-phone {
-            font-size: 7px;
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: 500;
-        }
-
-        /* Devise de l'école */
-        .school-motto {
-            font-size: 6px;
-            color: rgba(255, 255, 255, 0.7);
-            font-style: italic;
-            margin-top: 1px;
-            text-align: center;
-        }
-
-        /* Amélioration du logo de l'école */
-        .school-logo {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid rgba(255, 255, 255, 0.4);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 2px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Pattern décoratif en arrière-plan */
-        .student-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100px;
-            height: 100px;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-            border-radius: 50%;
-            transform: translate(30%, -30%);
-        }
-
-        .student-card::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 80px;
-            height: 80px;
-            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
-            border-radius: 50%;
-            transform: translate(-30%, 30%);
-        }
 
         /* En-tête de la carte */
         .card-header {
-            text-align: center;
-            padding: 8px 12px;
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1;
             position: relative;
-            z-index: 2;
+            margin-bottom: 10px;
         }
 
         .school-info {
@@ -515,129 +429,151 @@ $page_title = count($eleves) > 1 ?
             align-items: center;
             justify-content: center;
             gap: 8px;
+            flex-direction: column;
+            text-align: center;
         }
 
         .school-logo {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 2px;
+            width: 45px;
+            height: 45px;
+            object-fit: contain;
         }
 
         .school-name {
-            font-size: 11px;
+            font-size: 18px;
             font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            color: var(--primary-color);
+            margin-top: 0;
+            z-index: 1;
+            text-align: center;
+            position: relative;
         }
 
-        .card-type {
-            font-size: 7px;
-            opacity: 0.8;
-            margin-top: 1px;
+        .school-address {
+            text-align: center;
+            font-size: 10px;
+            color: #444;
+            margin-bottom: 8px;
+            z-index: 1;
+            position: relative;
+        }
+
+        .card-title {
+            background: linear-gradient(90deg, var(--primary-color), var(--primary-dark));
+            color: #fff;
+            font-weight: 700;
+            text-transform: uppercase;
+            text-align: center;
+            padding: 5px 0;
+            margin-bottom: 10px;
+            font-size: 14px;
+            border-radius: 5px;
+            letter-spacing: 1px;
+            position: relative;
+            z-index: 1;
         }
 
         /* Corps de la carte */
         .card-body {
-            padding: 12px 15px;
             display: flex;
-            gap: 12px;
+            justify-content: space-between;
+            gap: 10px;
             position: relative;
-            z-index: 2;
+            z-index: 1;
+            flex: 1;
+            margin-bottom: 10px;
+            padding: 8px;
         }
 
         .student-photo {
-            width: 65px;
-            height: 65px;
-            border-radius: 12px;
+            width: 70px;
+            height: 80px;
             object-fit: cover;
-            border: 3px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid var(--primary-color);
+            border-radius: 6px;
+            background: #f8f9fa;
         }
 
         .student-info {
             flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            font-family: 'Courier Prime', monospace;
+            font-size: 11px;
+            line-height: 1.3;
         }
 
-        .student-name {
-            font-size: 13px;
-            font-weight: 800;
-            margin-bottom: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            line-height: 1.2;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        .student-info p {
+            margin: 2px 0;
+            font-size: 10px;
+        }
+
+        .student-info span {
+            border-bottom: 1px dotted var(--primary-color);
+            padding-right: 30px;
+            display: inline-block;
+            min-width: 70px;
+            font-size: 10px;
         }
 
         .matricule {
-            background: rgba(255, 255, 255, 0.25);
-            backdrop-filter: blur(10px);
-            padding: 3px 8px;
-            border-radius: 12px;
+            margin-top: 1px;
+           
+            padding-bottom: 100px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+            color: var(--primary-color);
+            border: 2px dashed var(--primary-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            z-index: 2;
+            position: relative;
+            background: #fff;
+        }
+
+        .seal-date {
             font-size: 9px;
-            font-weight: 600;
-            display: inline-block;
-            margin-bottom: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .student-details {
-            font-size: 8px;
+            color: #555;
+            margin-top: 22px;
+            text-align: center;
             line-height: 1.3;
-            opacity: 0.95;
         }
 
-        .student-details div {
-            margin-bottom: 2px;
+        .card-bottom {
+            margin-top: auto;
+            padding-top: 15px;
+            border-top: 1px solid rgba(0, 123, 255, 0.2);
+            margin-bottom: 15px;
         }
 
-        .detail-label {
+        .admin-name {
+            font-size: 11px;
             font-weight: 600;
-            opacity: 0.8;
+            color: var(--primary-color);
+            margin-top: 0;
+            margin-bottom: 1px;
+            text-align: left;
+            z-index: 1;
+            position: relative;
         }
 
         /* QR Code */
         .qr-code {
             position: absolute;
-            bottom: 8px;
-            right: 8px;
-            width: 35px;
-            height: 35px;
+            bottom: 20px;
+            right: 20px;
+            width: 45px;
+            height: 45px;
             background: rgba(255, 255, 255, 0.95);
-            border-radius: 6px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
             z-index: 3;
+            border: 2px solid var(--primary-color);
         }
 
-        /* Pied de carte */
-        .card-footer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            text-align: center;
-            padding: 4px 8px;
-            font-size: 7px;
-            background: rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(5px);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            z-index: 2;
-        }
 
-        .academic-year {
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: 500;
-        }
 
         /* Conteneur des cartes multiples */
         .cards-container {
@@ -649,11 +585,11 @@ $page_title = count($eleves) > 1 ?
             max-width: 100%;
         }
 
-        /* Grille pour impression (3x3 = 9 cartes par page) */
+        /* Grille pour impression (2x2 = 4 cartes par page A4) */
         .print-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
             padding: 20px;
             page-break-after: always;
         }
@@ -881,14 +817,14 @@ $page_title = count($eleves) > 1 ?
                 box-shadow: 0 0 0 1px #ddd !important;
                 margin: 5px !important;
                 page-break-inside: avoid;
-                width: 300px !important;
-                height: 190px !important;
+                width: 420px !important;
+                height: 320px !important;
             }
             
             .print-grid {
-                grid-template-columns: repeat(3, 300px);
-                gap: 10px;
-                padding: 10px;
+                grid-template-columns: repeat(2, 420px);
+                gap: 15px;
+                padding: 15px;
                 justify-content: center;
             }
             
@@ -947,7 +883,8 @@ $page_title = count($eleves) > 1 ?
             
             .student-card {
                 width: calc(100vw - 40px);
-                max-width: 320px;
+                max-width: 380px;
+                height: 350px;
             }
             
             .controls-panel {
@@ -997,12 +934,12 @@ $page_title = count($eleves) > 1 ?
                 <div class="col-md-6">
                     <small class="text-muted">
                         <i class="bi bi-info-circle me-1"></i>
-                        <strong>Impression optimisée :</strong> 9 cartes par page A4
+                        <strong>Impression optimisée :</strong> 4 cartes par page A4
                     </small>
                 </div>
                 <div class="col-md-6 text-md-end">
                     <small class="text-muted">
-                        Pages nécessaires : <strong><?php echo ceil(count($eleves) / 9); ?></strong>
+                        Pages nécessaires : <strong><?php echo ceil(count($eleves) / 4); ?></strong>
                     </small>
                 </div>
             </div>
@@ -1081,80 +1018,55 @@ $page_title = count($eleves) > 1 ?
             ?>
             
                     <div class="student-card" data-student-id="<?php echo $eleve['id']; ?>" 
-                         style="background: var(--primary-gradient);">
+                         data-school-name="<?php echo htmlspecialchars(strtoupper($eleve['ecole_nom'])); ?>">
                         <div class="edit-indicator">Éditer</div>
                         
-                <!-- En-tête avec logo école -->
+                <!-- En-tête avec logos -->
                 <div class="card-header">
-                    <div class="school-info">
-                                <img src="<?php echo getSchoolLogo($eleve); ?>" alt="Logo école" class="school-logo">
-                        <div>
-                            <div class="school-name"><?php echo htmlspecialchars(strtoupper($eleve['ecole_nom'])); ?></div>
-                            <div class="card-type">CARTE D'ÉLÈVE</div>
-                                    <?php if (!empty($eleve['devise_principale'])): ?>
-                                    <div class="school-motto"><?php echo htmlspecialchars($eleve['devise_principale']); ?></div>
-                                    <?php endif; ?>
-                        </div>
-                    </div>
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Flag_of_the_Democratic_Republic_of_the_Congo.svg" alt="Logo RDC" class="school-logo">
+                    <img src="<?php echo getSchoolLogo($eleve); ?>" alt="Logo école" class="school-logo">
                 </div>
+
+                <div class="school-name"><?php echo htmlspecialchars($eleve['ecole_nom']); ?></div>
+                <div class="school-address"><?php echo htmlspecialchars($eleve['ecole_adresse'] ?? 'Adresse non spécifiée'); ?></div>
+
+                <div class="card-title">Carte d'Élève</div>
                 
                 <!-- Corps de la carte -->
                 <div class="card-body">
-                    <!-- Photo de l'élève -->
-                    <img src="<?php echo $photo_path; ?>" alt="Photo élève" class="student-photo">
-                    
                     <!-- Informations de l'élève -->
                     <div class="student-info">
-                        <div>
-                            <div class="student-name">
-                                <?php echo htmlspecialchars($eleve['prenom'] . ' ' . $eleve['nom']); ?>
-                            </div>
-                            
-                            <div class="matricule">
-                                N° <?php echo htmlspecialchars($eleve['matricule']); ?>
-                            </div>
-                        </div>
-                        
-                        <div class="student-details">
-                            <div>
-                                <span class="detail-label">Né(e) le:</span> 
-                                <?php echo date('d/m/Y', strtotime($eleve['date_naissance'])); ?>
-                            </div>
-                            <div>
-                                <span class="detail-label">Âge:</span> <?php echo $age; ?> ans
-                            </div>
-                            <div>
-                                <span class="detail-label">Sexe:</span> 
-                                <?php echo $eleve['sexe'] == 'M' ? 'Masculin' : ($eleve['sexe'] == 'F' ? 'Féminin' : $eleve['sexe']); ?>
-                            </div>
-                            <?php if ($eleve['classe_nom']): ?>
-                            <div>
-                                <span class="detail-label">Classe:</span> <?php echo htmlspecialchars($eleve['classe_nom']); ?>
-                            </div>
-                            <?php endif; ?>
-                            <?php if ($eleve['niveau']): ?>
-                            <div>
-                                <span class="detail-label">Niveau:</span> <?php echo htmlspecialchars($eleve['niveau']); ?>
-                            </div>
-                            <?php endif; ?>
-                            <?php if ($eleve['niveau_detaille']): ?>
-                            <div>
-                                <span class="detail-label">Niveau détaillé:</span> <?php echo htmlspecialchars($eleve['niveau_detaille']); ?>
-                            </div>
-                            <?php endif; ?>
-                            <?php if ($eleve['type_etablissement']): ?>
-                            <div>
-                                <span class="detail-label">Type:</span> <?php echo htmlspecialchars($eleve['type_etablissement']); ?>
-                            </div>
-                            <?php endif; ?>
-                            <?php if ($eleve['groupe_sanguin']): ?>
-                            <div>
-                                <span class="detail-label">Groupe:</span> <?php echo htmlspecialchars($eleve['groupe_sanguin']); ?>
-                            </div>
-                            <?php endif; ?>
-                        </div>
+                        <p>Nom : <span><?php echo htmlspecialchars($eleve['prenom']); ?></span></p>
+                        <p>Post-nom : <span><?php echo htmlspecialchars($eleve['nom']); ?></span></p>
+                        <p>Sexe : <span><?php echo $eleve['sexe'] == 'M' ? 'Masculin' : ($eleve['sexe'] == 'F' ? 'Féminin' : $eleve['sexe']); ?></span></p>
+                        <p>Âge : <span><?php echo $age; ?> ans</span></p>
+                        <?php if ($eleve['classe_nom']): ?>
+                        <p>Classe : <span><?php echo htmlspecialchars($eleve['classe_nom']); ?></span></p>
+                        <?php endif; ?>
+                        <?php if (!empty($eleve['option_section'])): ?>
+                        <p>Option / Section : <span><?php echo htmlspecialchars($eleve['option_section']); ?></span></p>
+                        <?php endif; ?>
+                        <?php if ($eleve['annee_scolaire']): ?>
+                        <p>Année scolaire : <span><?php echo htmlspecialchars($eleve['annee_scolaire']); ?></span></p>
+                        <?php endif; ?>
+                        <?php if ($eleve['cycle']): ?>
+                        <p>Cycle : <span><?php echo htmlspecialchars(ucfirst($eleve['cycle'])); ?></span></p>
+                        <?php endif; ?>
+                        <div class="admin-name">Administrateur : <?php echo htmlspecialchars($eleve['directeur_nom'] ?? 'Non spécifié'); ?></div>
+                        <div class="matricule">Matricule : <?php echo htmlspecialchars($eleve['matricule']); ?></div>
+                    </div>
+                    
+                    <!-- Photo de l'élève -->
+                    <div style="text-align:center;">
+                        <img src="<?php echo $photo_path; ?>" alt="Photo Élève" class="student-photo">
+                                                        <div class="seal-date">
+                                    Sceau de l'Établissement<br>
+                                    Fait à <?php echo htmlspecialchars($eleve['ville'] ?? 'Kinshasa'); ?> le <?php echo date('d/m/Y'); ?>
+                                </div>
                     </div>
                 </div>
+
+                
                 
                 <!-- Section des tuteurs -->
                 <?php 
@@ -1195,14 +1107,7 @@ $page_title = count($eleves) > 1 ?
                 </div>
                 
                 <!-- Footer -->
-                <div class="card-footer">
-                    <div class="academic-year">
-                        Année <?php echo date('Y'); ?>-<?php echo date('Y') + 1; ?>
-                        <?php if ($eleve['directeur_nom']): ?>
-                            • <?php echo htmlspecialchars($eleve['directeur_nom']); ?>
-                        <?php endif; ?>
-                    </div>
-                </div>
+                
             </div>
         <?php endforeach; ?>
     </div>
@@ -1210,7 +1115,7 @@ $page_title = count($eleves) > 1 ?
     <!-- Layout d'impression (9 cartes par page) -->
     <div class="print-layout" style="display: none;">
         <?php 
-        $chunks = array_chunk($eleves, 9);
+        $chunks = array_chunk($eleves, 4);
         foreach ($chunks as $pageIndex => $pageEleves): 
         ?>
             <div class="print-grid">
@@ -1221,98 +1126,54 @@ $page_title = count($eleves) > 1 ?
                     ?>
                     
                     <div class="student-card" 
-                         style="background: var(--primary-gradient);">
+                         data-school-name="<?php echo htmlspecialchars(strtoupper($eleve['ecole_nom'])); ?>">
                         
                         <div class="card-header">
-                            <div class="school-info">
-                                <img src="<?php echo getSchoolLogo($eleve); ?>" alt="Logo" class="school-logo">
-                                <div>
-                                    <div class="school-name"><?php echo htmlspecialchars(strtoupper($eleve['ecole_nom'])); ?></div>
-                                    <div class="card-type">CARTE D'ÉLÈVE</div>
-                                    <?php if (!empty($eleve['devise_principale'])): ?>
-                                    <div class="school-motto"><?php echo htmlspecialchars($eleve['devise_principale']); ?></div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Flag_of_the_Democratic_Republic_of_the_Congo.svg" alt="Logo RDC" class="school-logo">
+                            <img src="<?php echo getSchoolLogo($eleve); ?>" alt="Logo école" class="school-logo">
                         </div>
+
+                        <div class="school-name"><?php echo htmlspecialchars($eleve['ecole_nom']); ?></div>
+                        <div class="school-address"><?php echo htmlspecialchars($eleve['ecole_adresse'] ?? 'Adresse non spécifiée'); ?></div>
+
+                        <div class="card-title">Carte d'Élève</div>
                         
                         <div class="card-body">
-                            <img src="<?php echo $photo_path; ?>" alt="Photo élève" class="student-photo">
-                            
                             <div class="student-info">
-                                <div>
-                                    <div class="student-name">
-                                        <?php echo htmlspecialchars($eleve['prenom'] . ' ' . $eleve['nom']); ?>
-                                    </div>
-                                    <div class="matricule">
-                                        N° <?php echo htmlspecialchars($eleve['matricule']); ?>
-                                    </div>
-                                </div>
-                                
-                                <div class="student-details">
-                                    <div><span class="detail-label">Né(e) le:</span> <?php echo date('d/m/Y', strtotime($eleve['date_naissance'])); ?></div>
-                                    <div><span class="detail-label">Âge:</span> <?php echo $age; ?> ans</div>
-                                    <div><span class="detail-label">Sexe:</span> <?php echo $eleve['sexe'] == 'M' ? 'M' : 'F'; ?></div>
-                                    <?php if ($eleve['classe_nom']): ?>
-                                    <div><span class="detail-label">Classe:</span> <?php echo htmlspecialchars($eleve['classe_nom']); ?></div>
-                                    <?php endif; ?>
-                                    <?php if ($eleve['niveau']): ?>
-                                    <div><span class="detail-label">Niveau:</span> <?php echo htmlspecialchars($eleve['niveau']); ?></div>
-                                    <?php endif; ?>
-                                    <?php if ($eleve['niveau_detaille']): ?>
-                                    <div><span class="detail-label">Niveau détaillé:</span> <?php echo htmlspecialchars($eleve['niveau_detaille']); ?></div>
-                                    <?php endif; ?>
-                                    <?php if ($eleve['type_etablissement']): ?>
-                                    <div><span class="detail-label">Type:</span> <?php echo htmlspecialchars($eleve['type_etablissement']); ?></div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Section des tuteurs pour l'impression -->
-                        <?php 
-                        $tuteurs = getTuteursInfo($db, $eleve['id']);
-                        if (!empty($tuteurs)): 
-                        ?>
-                        <div class="tutors-section">
-                            <div class="tutors-header">
-                                <i class="bi bi-people-fill"></i>
-                                <span>Tuteurs</span>
-                            </div>
-                            <div class="tutors-list">
-                                <?php foreach ($tuteurs as $tuteur): ?>
-                                <div class="tutor-item <?php echo $tuteur['tuteur_principal'] ? 'principal' : ''; ?>">
-                                    <div class="tutor-info">
-                                        <div class="tutor-name">
-                                            <?php echo htmlspecialchars($tuteur['prenom'] . ' ' . $tuteur['nom']); ?>
-                                            <?php if ($tuteur['tuteur_principal']): ?>
-                                                <span class="badge-principal">Principal</span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="tutor-details">
-                                            <span class="tutor-relation"><?php echo ucfirst($tuteur['lien_parente']); ?></span>
-                                            <?php if (!empty($tuteur['telephone'])): ?>
-                                                <span class="tutor-phone">📞 <?php echo htmlspecialchars($tuteur['telephone']); ?></span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                        <?php endif; ?>
-                        
-                        <div class="qr-code">
-                            <canvas class="qr-print" data-student-id="<?php echo $eleve['id']; ?>" width="30" height="30"></canvas>
-                        </div>
-                        
-                        <div class="card-footer">
-                            <div class="academic-year">
-                                Année <?php echo date('Y'); ?>-<?php echo date('Y') + 1; ?>
-                                <?php if ($eleve['directeur_nom']): ?>
-                                    • <?php echo htmlspecialchars($eleve['directeur_nom']); ?>
+                                <p>Nom : <span><?php echo htmlspecialchars($eleve['prenom']); ?></span></p>
+                                <p>Post-nom : <span><?php echo htmlspecialchars($eleve['nom']); ?></span></p>
+                                <p>Sexe : <span><?php echo $eleve['sexe'] == 'M' ? 'Masculin' : 'Féminin'; ?></span></p>
+                                <p>Âge : <span><?php echo $age; ?> ans</span></p>
+                                <?php if ($eleve['classe_nom']): ?>
+                                <p>Classe : <span><?php echo htmlspecialchars($eleve['classe_nom']); ?></span></p>
+                                <?php endif; ?>
+                                <?php if (!empty($eleve['option_section'])): ?>
+                                <p>Option / Section : <span><?php echo htmlspecialchars($eleve['option_section']); ?></span></p>
+                                <?php endif; ?>
+                                <?php if ($eleve['annee_scolaire']): ?>
+                                <p>Année scolaire : <span><?php echo htmlspecialchars($eleve['annee_scolaire']); ?></span></p>
+                                <?php endif; ?>
+                                <?php if ($eleve['cycle']): ?>
+                                <p>Cycle : <span><?php echo htmlspecialchars(ucfirst($eleve['cycle'])); ?></span></p>
                                 <?php endif; ?>
                             </div>
+                            
+                            <div style="text-align:center;">
+                                <img src="<?php echo $photo_path; ?>" alt="Photo Élève" class="student-photo">
+                                <div class="seal-date">
+                                    Sceau de l'Établissement<br>
+                                    Fait à <?php echo htmlspecialchars($eleve['ville'] ?? 'Kinshasa'); ?> le <?php echo date('d/m/Y'); ?>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-bottom">
+                            <div class="admin-name">Administrateur : <?php echo htmlspecialchars($eleve['directeur_nom'] ?? 'Non spécifié'); ?></div>
+                            <div class="matricule">Matricule : <?php echo htmlspecialchars($eleve['matricule']); ?></div>
+                        </div>
+                        
+                        <div class="qr-code">
+                            <canvas class="qr-print" data-student-id="<?php echo $eleve['id']; ?>" width="35" height="35"></canvas>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -1340,7 +1201,7 @@ $page_title = count($eleves) > 1 ?
                             <ul class="list-unstyled">
                                 <li><strong>Code QR:</strong> Identité numérique sécurisée</li>
                                 <li><strong>Matricule:</strong> Unique dans l'établissement</li>
-                                <li><strong>Format:</strong> 320x200 pixels optimisé</li>
+                                <li><strong>Format:</strong> 400x300 pixels optimisé</li>
                                 <li><strong>Impression:</strong> Recommandée sur papier cartonné</li>
                             </ul>
                         </div>
@@ -1383,8 +1244,8 @@ $page_title = count($eleves) > 1 ?
                 const canvas = document.getElementById('qrcode-' + eleve.id);
                 if (canvas) {
                     QRCode.toCanvas(canvas, qrData, {
-                        width: 30,
-                        height: 30,
+                        width: 35,
+                        height: 35,
                         margin: 0,
                         color: { dark: '#000000', light: '#FFFFFF' }
                     });
@@ -1394,8 +1255,8 @@ $page_title = count($eleves) > 1 ?
                 const printCanvas = document.querySelector('.qr-print[data-student-id="' + eleve.id + '"]');
                 if (printCanvas) {
                     QRCode.toCanvas(printCanvas, qrData, {
-                        width: 30,
-                        height: 30,
+                        width: 35,
+                        height: 35,
                         margin: 0,
                         color: { dark: '#000000', light: '#FFFFFF' }
                     });
@@ -1413,9 +1274,9 @@ $page_title = count($eleves) > 1 ?
             });
 
             const cards = document.querySelectorAll('.student-card');
-            const cardsPerPage = 9;
-            const cardWidth = 85; // mm
-            const cardHeight = 54; // mm
+            const cardsPerPage = 4;
+            const cardWidth = 105; // mm
+            const cardHeight = 80; // mm
             const marginX = 15;
             const marginY = 20;
             const spacingX = 5;
@@ -1425,8 +1286,8 @@ $page_title = count($eleves) > 1 ?
             let cardIndex = 0;
 
             function addCardToPage(card, position) {
-                const row = Math.floor(position / 3);
-                const col = position % 3;
+                const row = Math.floor(position / 2);
+                const col = position % 2;
                 const x = marginX + col * (cardWidth + spacingX);
                 const y = marginY + row * (cardHeight + spacingY);
 

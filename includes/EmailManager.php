@@ -218,7 +218,7 @@ class EmailManager {
                     <p><strong>Durée estimée :</strong> 24-48 heures pour la validation</p>
                     
                     <div style='text-align: center; margin: 30px 0;'>
-                        <a href='https://naklass.impact-entreprises.net' class='btn'>Accéder à Naklass</a>
+                        <a href='https://naclasse.impact-entreprises.net//auth/login.php' class='btn'>Accéder à Naklass</a>
                     </div>
                 </div>
                 
@@ -258,7 +258,7 @@ PROCHAINES ÉTAPES :
 
 Durée estimée : 24-48 heures pour la validation
 
-Accéder à Naklass : https://naklass.impact-entreprises.net
+Accéder à Naklass : https://naclasse.impact-entreprises.net//auth/login.php
 
 © " . date('Y') . " Naklass - Système de Gestion Scolaire";
     }
@@ -309,7 +309,7 @@ Accéder à Naklass : https://naklass.impact-entreprises.net
                     </div>
                     
                     <div style='text-align: center; margin: 30px 0;'>
-                        <a href='https://naklass.impact-entreprises.net/superadmin/school_validation.php?id={$ecoleData['ecole_id']}' class='btn'>Valider cette école</a>
+                        <a href='https://naclasse.impact-entreprises.net//superadmin/school_validation.php?id={$ecoleData['ecole_id']}' class='btn'>Valider cette école</a>
                     </div>
                 </div>
             </div>
@@ -337,7 +337,141 @@ DÉTAILS DE LA DEMANDE :
 - Directeur : {$ecoleData['directeur_nom']}
 - ID Visiteur : {$ecoleData['visitor_id']}
 
-Valider cette école : https://naklass.impact-entreprises.net/superadmin/school_validation.php?id={$ecoleData['ecole_id']}";
+Valider cette école : https://naclasse.impact-entreprises.net//superadmin/school_validation.php?id={$ecoleData['ecole_id']}";
+    }
+    
+    /**
+     * Envoie les identifiants de création d'école
+     */
+    public function sendSchoolCreationWithCredentials($credentials) {
+        try {
+            $this->mailer->clearAddresses();
+            $this->mailer->setFrom(SMTP_FROM_EMAIL, SMTP_FROM_NAME);
+            $this->mailer->addAddress($credentials['admin_email']);
+            $this->mailer->Subject = 'Votre école a été créée - Identifiants d\'administration';
+            
+            $this->mailer->isHTML(true);
+            $this->mailer->Body = $this->getSchoolCreationWithCredentialsEmailTemplate($credentials);
+            $this->mailer->AltBody = $this->getSchoolCreationWithCredentialsEmailTextTemplate($credentials);
+            
+            $result = $this->mailer->send();
+            
+            if ($this->debug) {
+                $this->logEmail("Email de création d'école avec identifiants envoyé à : " . $credentials['email']);
+            }
+            
+            return $result;
+            
+        } catch (Exception $e) {
+            if ($this->debug) {
+                $this->logEmail("Erreur envoi email création école : " . $e->getMessage());
+            }
+            throw $e;
+        }
+    }
+    
+    /**
+     * Template HTML pour l'email de création d'école avec identifiants
+     */
+    private function getSchoolCreationWithCredentialsEmailTemplate($credentials) {
+        return "
+        <!DOCTYPE html>
+        <html lang='fr'>
+        <head>
+            <meta charset='UTF-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            <title>Votre école a été créée</title>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
+                .credentials-box { background: #28a745; color: white; padding: 20px; border-radius: 10px; margin: 20px 0; }
+                .credential-item { background: rgba(255,255,255,0.2); padding: 10px; margin: 10px 0; border-radius: 5px; }
+                .btn { display: inline-block; background: #667eea; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+                .btn:hover { background: #5a6fd8; }
+                .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h1>🎉 Félicitations !</h1>
+                    <h2>Votre école a été créée avec succès</h2>
+                </div>
+                
+                <div class='content'>
+                    <h3>Bonjour,</h3>
+                    
+                    <p>Votre établissement scolaire <strong>{$credentials['nom_ecole']}</strong> a été créé et validé automatiquement dans le système Naklass.</p>
+                    
+                    <div class='credentials-box'>
+                        <h4>🔑 Vos Identifiants d'Administration</h4>
+                        <div class='credential-item'>
+                            <strong>Nom d'utilisateur :</strong> {$credentials['admin_username']}
+                        </div>
+                        <div class='credential-item'>
+                            <strong>Mot de passe :</strong> {$credentials['admin_password']}
+                        </div>
+                        <div class='credential-item'>
+                            <strong>Code École :</strong> {$credentials['code_ecole']}
+                        </div>
+                    </div>
+                    
+                    <h4>📋 Prochaines étapes :</h4>
+                    <ol>
+                        <li>Connectez-vous avec vos identifiants ci-dessus</li>
+                        <li>Configurez vos classes et niveaux</li>
+                        <li>Ajoutez vos enseignants</li>
+                        <li>Commencez à inscrire vos élèves</li>
+                    </ol>
+                    
+                    <div style='text-align: center; margin: 30px 0;'>
+                        <a href='https://naclasse.impact-entreprises.net//auth/login.php' class='btn'>Se connecter maintenant</a>
+                    </div>
+                    
+                    <div style='background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;'>
+                        <strong>⚠️ Important :</strong> Conservez précieusement ces identifiants. Vous en aurez besoin pour accéder à votre espace d'administration.
+                    </div>
+                </div>
+                
+                <div class='footer'>
+                    <p>Naklass - Système de Gestion Scolaire</p>
+                    <p>© " . date('Y') . " - Tous droits réservés</p>
+                </div>
+            </div>
+        </body>
+        </html>";
+    }
+    
+    /**
+     * Template texte pour l'email de création d'école avec identifiants
+     */
+    private function getSchoolCreationWithCredentialsEmailTextTemplate($credentials) {
+        return "
+FÉLICITATIONS ! VOTRE ÉCOLE A ÉTÉ CRÉÉE
+
+Bonjour,
+
+Votre établissement scolaire {$credentials['nom_ecole']} a été créé et validé automatiquement dans le système Naklass.
+
+VOS IDENTIFIANTS D'ADMINISTRATION :
+- Nom d'utilisateur : {$credentials['admin_username']}
+- Mot de passe : {$credentials['admin_password']}
+- Code École : {$credentials['code_ecole']}
+
+PROCHAINES ÉTAPES :
+1. Connectez-vous avec vos identifiants ci-dessus
+2. Configurez vos classes et niveaux
+3. Ajoutez vos enseignants
+4. Commencez à inscrire vos élèves
+
+Lien de connexion : https://naclasse.impact-entreprises.net//auth/login.php
+
+IMPORTANT : Conservez précieusement ces identifiants. Vous en aurez besoin pour accéder à votre espace d'administration.
+
+Naklass - Système de Gestion Scolaire
+© " . date('Y') . " - Tous droits réservés";
     }
     
     /**

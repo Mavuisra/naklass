@@ -78,7 +78,10 @@ if (!$errors) {
 $bulletins = [];
 if (!$errors) {
     try {
-        $bulletins_query = "SELECT b.*, e.nom, e.prenom, e.matricule, c.nom_classe, c.niveau,
+        $bulletins_query = "SELECT b.id, b.eleve_id, b.classe_id, b.periode, b.annee_scolaire, 
+                                  b.moyenne_generale, b.effectif_classe, b.genere_le, b.genere_par, b.statut,
+                                  b.valide, b.valide_par, b.date_validation,
+                                  e.nom, e.prenom, e.matricule, c.nom_classe, c.niveau,
                                   u.nom as generateur_nom, u.prenom as generateur_prenom
                            FROM bulletins b
                            JOIN eleves e ON b.eleve_id = e.id
@@ -151,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 ]);
                 
                 if (!$existing_stmt->fetch()) {
-                                         // Calculer la moyenne générale de l'élève pour cette période
+                                                             // Calculer la moyenne générale de l'élève pour cette période
                      $moyenne_query = "SELECT AVG(n.valeur) as moyenne, COUNT(n.id) as nb_evaluations
                                       FROM notes n
                                       JOIN evaluations ev ON n.evaluation_id = ev.id
@@ -161,15 +164,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                       AND n.eleve_id = :eleve_id
                                       AND n.absent = 0
                                       AND n.validee = 1";
-                    $moyenne_stmt = $db->prepare($moyenne_query);
-                    $moyenne_stmt->execute([
-                        'classe_id' => $classe_id,
-                        'periode' => $periode,
-                        'eleve_id' => $eleve['id']
-                    ]);
-                    $moyenne_data = $moyenne_stmt->fetch();
-                    
-                    $moyenne_generale = $moyenne_data['moyenne'] ? round($moyenne_data['moyenne'], 2) : null;
+                     $moyenne_stmt = $db->prepare($moyenne_query);
+                     $moyenne_stmt->execute([
+                         'classe_id' => $classe_id,
+                         'periode' => $periode,
+                         'eleve_id' => $eleve['id']
+                     ]);
+                     $moyenne_data = $moyenne_stmt->fetch();
+                     
+                     // Debug: Log les données de moyenne
+                     error_log("Calcul moyenne pour élève {$eleve['id']}, classe $classe_id, période $periode: " . 
+                              "moyenne=" . ($moyenne_data['moyenne'] ?? 'NULL') . 
+                              ", nb_evaluations=" . ($moyenne_data['nb_evaluations'] ?? 0));
+                     
+                     $moyenne_generale = ($moyenne_data['moyenne'] !== null && $moyenne_data['nb_evaluations'] > 0) 
+                                        ? round($moyenne_data['moyenne'], 2) 
+                                        : null;
                     
                                          // Insérer le bulletin
                      $insert_query = "INSERT INTO bulletins (eleve_id, classe_id, periode, annee_scolaire, 
@@ -241,7 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                                   AND ev.periode = :periode
                                                   AND n.absent = 0
                                                   AND n.validee = 1
-                                                  AND i.classe_id = :classe_id
+                                                  AND i.classe_id = :classe_id2
                                                   AND i.annee_scolaire = :annee_scolaire
                                                   GROUP BY e.id
                                                   HAVING AVG(n.valeur) > :moyenne_eleve
@@ -251,6 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                              'classe_id' => $classe_id,
                              'cours_id' => $matiere['cours_id'],
                              'periode' => $periode,
+                             'classe_id2' => $classe_id,
                              'annee_scolaire' => $annee_scolaire['libelle'],
                              'moyenne_eleve' => $moyenne_matiere ?: 0
                          ]);
@@ -602,9 +613,12 @@ $page_title = "Bulletins Scolaires";
                                                         <span class="badge bg-info"><?php echo htmlspecialchars($bulletin['periode']); ?></span>
                                                     </td>
                                                     <td>
-                                                        <?php if ($bulletin['moyenne_generale']): ?>
-                                                            <span class="fw-bold <?php echo $bulletin['moyenne_generale'] >= 10 ? 'text-success' : 'text-danger'; ?>">
-                                                                <?php echo number_format($bulletin['moyenne_generale'], 2); ?>/20
+                                                        <?php 
+                                                        $moyenne = $bulletin['moyenne_generale'];
+                                                        ?>
+                                                        <?php if ($moyenne !== null && $moyenne !== '' && $moyenne !== false): ?>
+                                                            <span class="fw-bold <?php echo $moyenne >= 10 ? 'text-success' : 'text-danger'; ?>">
+                                                                <?php echo number_format($moyenne, 2); ?>/20
                                                             </span>
                                                         <?php else: ?>
                                                             <span class="text-muted">-</span>

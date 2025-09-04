@@ -57,8 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         setFlashMessage('error', 'Cet élève est déjà inscrit dans cette classe.');
                     } else {
                         // Inscrire l'élève
-                        $insert_query = "INSERT INTO inscriptions (eleve_id, classe_id, annee_scolaire, date_inscription, statut, remarques, created_by, statut_record) 
-                                       VALUES (:eleve_id, :classe_id, :annee_scolaire, :date_inscription, 'validée', :notes, :created_by, 'actif')";
+                        $insert_query = "INSERT INTO inscriptions (eleve_id, classe_id, annee_scolaire, date_inscription, statut_inscription, notes, created_by) 
+                                       VALUES (:eleve_id, :classe_id, :annee_scolaire, :date_inscription, 'validée', :notes, :created_by)";
                         $stmt = $db->prepare($insert_query);
                         $result = $stmt->execute([
                             'eleve_id' => $eleve_id,

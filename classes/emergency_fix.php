@@ -107,8 +107,8 @@ try {
         echo "<p class='text-danger'>❌ Impossible de lire students.php</p>";
     } else {
         // Remplacer la requête problématique
-        $old_query = "INSERT INTO inscriptions (eleve_id, classe_id, annee_scolaire, date_inscription, statut, remarques, created_by, statut_record) 
-                      VALUES (:eleve_id, :classe_id, :annee_scolaire, :date_inscription, 'validée', :notes, :created_by, 'actif')";
+        $old_query = "INSERT INTO inscriptions (eleve_id, classe_id, annee_scolaire, date_inscription, statut_inscription, notes, created_by) 
+                      VALUES (:eleve_id, :classe_id, :annee_scolaire, :date_inscription, 'validée', :notes, :created_by)";
         
         $new_query = $minimal_query;
         

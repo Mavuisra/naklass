@@ -114,7 +114,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'ecole_id' => $ecole_id
         ];
         
-        // Envoyer l'email de confirmation
+        // Créer automatiquement un compte utilisateur pour le responsable
+        $account_created = false;
+        $account_data = null;
+        $account_error = '';
+        
+        try {
+            require_once 'includes/SchoolAccountManager.php';
+            $accountManager = new SchoolAccountManager();
+            
+            // Valider les données avant création du compte
+            $validation = $accountManager->validateSchoolData($ecoleData);
+            if ($validation['valid']) {
+                $accountResult = $accountManager->createSchoolAccount($ecoleData);
+                if ($accountResult['success']) {
+                    $account_created = true;
+                    $account_data = $accountResult;
+                } else {
+                    $account_error = $accountResult['error'];
+                }
+            } else {
+                $account_error = implode(', ', $validation['errors']);
+            }
+        } catch (Exception $e) {
+            $account_error = $e->getMessage();
+        }
+        
+        // Envoyer l'email de confirmation avec identifiants
         $email_sent = false;
         $email_error = '';
         
@@ -122,8 +148,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             require_once 'includes/EmailManager.php';
             $emailManager = new EmailManager();
             
-            // Envoyer l'email de confirmation au visiteur
-            if ($emailManager->sendSchoolCreationConfirmation($ecoleData)) {
+            // Envoyer l'email de confirmation au visiteur avec identifiants
+            if ($emailManager->sendSchoolCreationConfirmation($ecoleData, $account_data)) {
                 $email_sent = true;
                 
                 // Envoyer la notification à l'administrateur
@@ -137,16 +163,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $success .= "<br><strong>Code d'école :</strong> {$code_ecole}";
         $success .= "<br><strong>ID :</strong> {$ecole_id}";
         
-        if ($email_sent) {
-            $success .= "<br><br>📧 Un email de confirmation a été envoyé à votre adresse email.";
+        // Informations du compte créé
+        if ($account_created && $account_data) {
+            $success .= "<br><br>🔐 <strong>Compte administrateur créé automatiquement :</strong>";
+            $success .= "<br>• <strong>Email de connexion :</strong> " . htmlspecialchars($account_data['email']);
+            $success .= "<br>• <strong>Mot de passe temporaire :</strong> " . htmlspecialchars($account_data['temp_password']);
+            $success .= "<br>• <strong>Lien de connexion :</strong> <a href='" . htmlspecialchars($account_data['login_url']) . "' target='_blank'>Se connecter maintenant</a>";
+            $success .= "<br><br>⚠️ <strong>Important :</strong> Utilisez votre email et le mot de passe temporaire pour vous connecter. Changez votre mot de passe lors de votre première connexion.";
         } else {
-            $success .= "<br><br>⚠️ L'école a été créée mais l'envoi de l'email a échoué.";
-            if (!empty($email_error)) {
-                $success .= "<br><small class='text-muted'>Erreur : " . htmlspecialchars($email_error) . "</small>";
+            $success .= "<br><br>⚠️ L'école a été créée mais le compte administrateur n'a pas pu être créé.";
+            if (!empty($account_error)) {
+                $success .= "<br><small class='text-muted'>Erreur compte : " . htmlspecialchars($account_error) . "</small>";
             }
         }
         
-        $success .= "<br><br>Un super administrateur va examiner votre demande et vous contactera bientôt.";
+        // Statut de l'email
+        if ($email_sent) {
+            $success .= "<br><br>📧 Un email de confirmation avec vos identifiants a été envoyé à votre adresse email.";
+        } else {
+            $success .= "<br><br>⚠️ L'envoi de l'email a échoué.";
+            if (!empty($email_error)) {
+                $success .= "<br><small class='text-muted'>Erreur email : " . htmlspecialchars($email_error) . "</small>";
+            }
+        }
+        
+        $success .= "<br><br>🎉 <strong>Votre école est maintenant active !</strong> Vous pouvez commencer à configurer votre établissement.";
         
         // Marquer le visiteur comme ayant créé une école
         setcookie('naklass_ecole_created', $ecole_id, time() + (86400 * 365), '/');
@@ -386,9 +427,9 @@ function sanitize($data) {
                         <?php if ($is_new_visitor): ?>
                         <div class="visitor-info">
                             <i class="bi bi-info-circle me-2"></i>
-                            <strong>Nouveau visiteur détecté !</strong> 
-                            Nous avons créé un identifiant unique pour vous suivre.
-                            <br><small class="text-muted">ID Visiteur : <?php echo htmlspecialchars($visitor_id); ?></small>
+                            <strong class="text-primary text-bold">Bienvenue sur Naklass !</strong> 
+                            <!-- Nous avons créé un identifiant unique pour vous suivre.
+                            <br><small class="text-muted">ID Visiteur : </small> -->
                         </div>
                         <?php endif; ?>
                         

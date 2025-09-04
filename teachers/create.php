@@ -31,7 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'experience_annees' => intval($_POST['experience_annees'] ?? 0),
         'date_embauche' => sanitize($_POST['date_embauche'] ?? ''),
         'statut_record' => sanitize($_POST['statut_record'] ?? 'actif'),
-        'notes_internes' => sanitize($_POST['notes_internes'] ?? '')
+        'notes_internes' => sanitize($_POST['notes_internes'] ?? ''),
+        // Champs pour le compte utilisateur
+        'create_user_account' => isset($_POST['create_user_account']),
+        'user_email' => sanitize($_POST['user_email'] ?? ''),
+        'user_password' => sanitize($_POST['user_password'] ?? ''),
+        'user_username' => sanitize($_POST['user_username'] ?? '')
     ];
     
     // Validation
@@ -59,6 +64,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = "L'expérience ne peut pas être négative.";
     }
     
+    // Validation pour le compte utilisateur
+    if ($data['create_user_account']) {
+        if (empty($data['user_email'])) {
+            $errors[] = "L'email du compte utilisateur est obligatoire si vous créez un compte.";
+        } elseif (!validateEmail($data['user_email'])) {
+            $errors[] = "L'adresse email du compte utilisateur n'est pas valide.";
+        }
+        
+        if (empty($data['user_password'])) {
+            $errors[] = "Le mot de passe du compte utilisateur est obligatoire.";
+        } elseif (strlen($data['user_password']) < 6) {
+            $errors[] = "Le mot de passe doit contenir au moins 6 caractères.";
+        }
+        
+        // Vérifier la confirmation du mot de passe
+        $confirm_password = sanitize($_POST['confirm_password'] ?? '');
+        if ($data['user_password'] !== $confirm_password) {
+            $errors[] = "Les mots de passe ne correspondent pas.";
+        }
+        
+        if (empty($data['user_username'])) {
+            $errors[] = "Le nom d'utilisateur est obligatoire si vous créez un compte.";
+        }
+        
+        // Vérifier l'unicité de l'email utilisateur
+        if (!empty($data['user_email'])) {
+            $check_email_query = "SELECT id FROM utilisateurs WHERE email = :email";
+            $stmt = $db->prepare($check_email_query);
+            $stmt->execute(['email' => $data['user_email']]);
+            
+            if ($stmt->fetch()) {
+                $errors[] = "Cette adresse email est déjà utilisée par un autre utilisateur.";
+            }
+        }
+        
+        // Vérifier l'unicité du nom d'utilisateur
+        if (!empty($data['user_username'])) {
+            $check_username_query = "SELECT id FROM utilisateurs WHERE nom = :username AND ecole_id = :ecole_id";
+            $stmt = $db->prepare($check_username_query);
+            $stmt->execute([
+                'username' => $data['user_username'],
+                'ecole_id' => $_SESSION['ecole_id']
+            ]);
+            
+            if ($stmt->fetch()) {
+                $errors[] = "Ce nom d'utilisateur est déjà utilisé dans votre école.";
+            }
+        }
+    }
+    
     // Vérifier l'unicité du matricule
     if (!empty($data['matricule_enseignant'])) {
         $check_query = "SELECT id FROM enseignants WHERE matricule_enseignant = :matricule AND ecole_id = :ecole_id";
@@ -81,23 +136,96 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data['specialites'] = json_encode([]);
     }
     
+    // Traitement de la photo
+    $photo_path = null;
+    if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = '../uploads/teachers/';
+        
+        // Créer le dossier s'il n'existe pas
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+        
+        $file_info = $_FILES['photo'];
+        $file_extension = strtolower(pathinfo($file_info['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+        
+        // Validation du type de fichier
+        if (!in_array($file_extension, $allowed_extensions)) {
+            $errors[] = "Le format de fichier n'est pas supporté. Utilisez JPG, PNG ou GIF.";
+        }
+        
+        // Validation de la taille (2MB max)
+        if ($file_info['size'] > 2 * 1024 * 1024) {
+            $errors[] = "La taille du fichier ne doit pas dépasser 2MB.";
+        }
+        
+        // Validation de l'image
+        $image_info = getimagesize($file_info['tmp_name']);
+        if ($image_info === false) {
+            $errors[] = "Le fichier n'est pas une image valide.";
+        }
+        
+        if (empty($errors)) {
+            // Générer un nom de fichier unique
+            $filename = uniqid() . '_' . time() . '.' . $file_extension;
+            $photo_path = $upload_dir . $filename;
+            
+            // Déplacer le fichier
+            if (!move_uploaded_file($file_info['tmp_name'], $photo_path)) {
+                $errors[] = "Erreur lors du téléchargement de la photo.";
+            } else {
+                // Convertir le chemin relatif pour la base de données
+                $photo_path = 'uploads/teachers/' . $filename;
+            }
+        }
+    }
+    
     if (empty($errors)) {
         try {
             $db->beginTransaction();
             
+            $utilisateur_id = null;
+            
+            // Créer le compte utilisateur si demandé
+            if ($data['create_user_account']) {
+                $user_password_hash = password_hash($data['user_password'], PASSWORD_DEFAULT);
+                
+                $insert_user_query = "INSERT INTO utilisateurs (
+                    ecole_id, role_id, nom, prenom, email, telephone, mot_de_passe_hash, actif, created_by
+                ) VALUES (
+                    :ecole_id, 3, :nom, :prenom, :email, :telephone, :mot_de_passe_hash, 1, :created_by
+                )";
+                
+                $user_stmt = $db->prepare($insert_user_query);
+                $user_stmt->execute([
+                    'ecole_id' => $_SESSION['ecole_id'],
+                    'nom' => $data['user_username'],
+                    'prenom' => $data['prenom'],
+                    'email' => $data['user_email'],
+                    'telephone' => $data['telephone'] ?: null,
+                    'mot_de_passe_hash' => $user_password_hash,
+                    'created_by' => $_SESSION['user_id']
+                ]);
+                
+                $utilisateur_id = $db->lastInsertId();
+            }
+            
+            // Créer l'enseignant
             $insert_query = "INSERT INTO enseignants (
-                ecole_id, matricule_enseignant, nom, prenom, sexe, date_naissance, lieu_naissance,
+                ecole_id, utilisateur_id, matricule_enseignant, nom, prenom, sexe, date_naissance, lieu_naissance,
                 nationalite, telephone, email, adresse_complete, specialites, diplomes,
-                experience_annees, date_embauche, statut_record, notes_internes, created_by
+                experience_annees, date_embauche, statut_record, notes_internes, photo_path, created_by
             ) VALUES (
-                :ecole_id, :matricule_enseignant, :nom, :prenom, :sexe, :date_naissance, :lieu_naissance,
+                :ecole_id, :utilisateur_id, :matricule_enseignant, :nom, :prenom, :sexe, :date_naissance, :lieu_naissance,
                 :nationalite, :telephone, :email, :adresse_complete, :specialites, :diplomes,
-                :experience_annees, :date_embauche, :statut_record, :notes_internes, :created_by
+                :experience_annees, :date_embauche, :statut_record, :notes_internes, :photo_path, :created_by
             )";
             
             $stmt = $db->prepare($insert_query);
             $stmt->execute([
                 'ecole_id' => $_SESSION['ecole_id'],
+                'utilisateur_id' => $utilisateur_id,
                 'matricule_enseignant' => $data['matricule_enseignant'],
                 'nom' => $data['nom'],
                 'prenom' => $data['prenom'],
@@ -114,12 +242,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'date_embauche' => $data['date_embauche'] ?: null,
                 'statut_record' => $data['statut_record'],
                 'notes_internes' => $data['notes_internes'] ?: null,
+                'photo_path' => $photo_path,
                 'created_by' => $_SESSION['user_id']
             ]);
             
             $db->commit();
             
-            setFlashMessage('success', "L'enseignant '{$data['prenom']} {$data['nom']}' a été créé avec succès.");
+            $success_message = "L'enseignant '{$data['prenom']} {$data['nom']}' a été créé avec succès.";
+            if ($data['create_user_account']) {
+                $success_message .= " Un compte utilisateur a également été créé avec l'email : {$data['user_email']}";
+            }
+            
+            setFlashMessage('success', $success_message);
             redirect('index.php');
             
         } catch (Exception $e) {
@@ -243,7 +377,7 @@ $page_title = "Nouvel Enseignant";
                 </div>
             <?php endif; ?>
             
-            <form method="POST" class="needs-validation" novalidate>
+            <form method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
                 <!-- Informations personnelles -->
                 <div class="form-section p-4">
                     <h4 class="mb-4">
@@ -379,6 +513,62 @@ $page_title = "Nouvel Enseignant";
                             <textarea class="form-control" id="notes_internes" name="notes_internes" rows="3"><?php echo htmlspecialchars($_POST['notes_internes'] ?? ''); ?></textarea>
                             <div class="form-text">Informations confidentielles sur l'enseignant</div>
                         </div>
+                        
+                        <div class="col-12">
+                            <label for="photo" class="form-label">Photo de l'enseignant</label>
+                            <input type="file" class="form-control" id="photo" name="photo" accept="image/*">
+                            <div class="form-text">Formats acceptés : JPG, PNG, GIF. Taille maximale : 2MB</div>
+                            <div id="photo-preview" class="mt-2" style="display: none;">
+                                <img id="preview-img" src="" alt="Aperçu" style="max-width: 150px; max-height: 150px; border-radius: 8px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Compte utilisateur -->
+                <div class="form-section p-4">
+                    <h4 class="mb-4">
+                        <i class="bi bi-person-check me-2"></i>Compte utilisateur
+                    </h4>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="create_user_account" name="create_user_account" 
+                               <?php echo isset($_POST['create_user_account']) ? 'checked' : ''; ?>>
+                        <label class="form-check-label" for="create_user_account">
+                            <strong>Créer un compte utilisateur pour cet enseignant</strong>
+                        </label>
+                        <div class="form-text">Permet à l'enseignant de se connecter au système</div>
+                    </div>
+                    
+                    <div id="user_account_fields" style="display: none;">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="user_username" class="form-label required-field">Nom d'utilisateur</label>
+                                <input type="text" class="form-control" id="user_username" name="user_username" 
+                                       value="<?php echo htmlspecialchars($_POST['user_username'] ?? ''); ?>">
+                                <div class="form-text">Nom d'utilisateur pour la connexion</div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="user_email" class="form-label required-field">Email de connexion</label>
+                                <input type="email" class="form-control" id="user_email" name="user_email" 
+                                       value="<?php echo htmlspecialchars($_POST['user_email'] ?? ''); ?>">
+                                <div class="form-text">Email utilisé pour se connecter au système</div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="user_password" class="form-label required-field">Mot de passe</label>
+                                <input type="password" class="form-control" id="user_password" name="user_password" 
+                                       minlength="6">
+                                <div class="form-text">Minimum 6 caractères</div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="confirm_password" class="form-label required-field">Confirmer le mot de passe</label>
+                                <input type="password" class="form-control" id="confirm_password" name="confirm_password" 
+                                       minlength="6">
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -449,6 +639,99 @@ $page_title = "Nouvel Enseignant";
                 if (experience >= 0) {
                     document.getElementById('experience_annees').value = experience;
                 }
+            }
+        });
+        
+        // Gestion de l'affichage des champs du compte utilisateur
+        const createUserAccountCheckbox = document.getElementById('create_user_account');
+        const userAccountFields = document.getElementById('user_account_fields');
+        
+        function toggleUserAccountFields() {
+            if (createUserAccountCheckbox.checked) {
+                userAccountFields.style.display = 'block';
+                // Rendre les champs obligatoires
+                document.getElementById('user_username').required = true;
+                document.getElementById('user_email').required = true;
+                document.getElementById('user_password').required = true;
+                document.getElementById('confirm_password').required = true;
+            } else {
+                userAccountFields.style.display = 'none';
+                // Rendre les champs optionnels
+                document.getElementById('user_username').required = false;
+                document.getElementById('user_email').required = false;
+                document.getElementById('user_password').required = false;
+                document.getElementById('confirm_password').required = false;
+            }
+        }
+        
+        createUserAccountCheckbox.addEventListener('change', toggleUserAccountFields);
+        
+        // Initialiser l'état au chargement de la page
+        toggleUserAccountFields();
+        
+        // Validation de la confirmation du mot de passe
+        document.getElementById('confirm_password').addEventListener('input', function() {
+            const password = document.getElementById('user_password').value;
+            const confirmPassword = this.value;
+            
+            if (password !== confirmPassword) {
+                this.setCustomValidity('Les mots de passe ne correspondent pas');
+            } else {
+                this.setCustomValidity('');
+            }
+        });
+        
+        // Auto-remplissage du nom d'utilisateur basé sur le prénom et nom
+        document.getElementById('prenom').addEventListener('input', function() {
+            if (createUserAccountCheckbox.checked && !document.getElementById('user_username').value) {
+                const prenom = this.value.toLowerCase();
+                const nom = document.getElementById('nom').value.toLowerCase();
+                if (prenom && nom) {
+                    document.getElementById('user_username').value = prenom + '.' + nom;
+                }
+            }
+        });
+        
+        document.getElementById('nom').addEventListener('input', function() {
+            if (createUserAccountCheckbox.checked && !document.getElementById('user_username').value) {
+                const prenom = document.getElementById('prenom').value.toLowerCase();
+                const nom = this.value.toLowerCase();
+                if (prenom && nom) {
+                    document.getElementById('user_username').value = prenom + '.' + nom;
+                }
+            }
+        });
+        
+        // Gestion de l'aperçu de la photo
+        document.getElementById('photo').addEventListener('change', function() {
+            const file = this.files[0];
+            const preview = document.getElementById('photo-preview');
+            const previewImg = document.getElementById('preview-img');
+            
+            if (file) {
+                // Vérifier le type de fichier
+                if (!file.type.startsWith('image/')) {
+                    alert('Veuillez sélectionner un fichier image.');
+                    this.value = '';
+                    return;
+                }
+                
+                // Vérifier la taille (2MB max)
+                if (file.size > 2 * 1024 * 1024) {
+                    alert('La taille du fichier ne doit pas dépasser 2MB.');
+                    this.value = '';
+                    return;
+                }
+                
+                // Afficher l'aperçu
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.style.display = 'none';
             }
         });
     </script>

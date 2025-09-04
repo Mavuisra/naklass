@@ -1,77 +1,102 @@
 <?php
 /**
  * Configuration initiale d'une nouvelle école
- * Cette page doit être complétée avant l'accès au système
+ * Cette page peut être utilisée par les visiteurs pour créer une école
+ * ou par les administrateurs pour configurer leur école existante
  */
 require_once '../config/database.php';
 require_once '../includes/functions.php';
 
-// Vérifier si l'utilisateur est connecté
-if (!isLoggedIn()) {
-    redirect('login.php');
+// Démarrer la session si pas encore démarrée
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-// Vérifier si l'utilisateur a une école
-if (!isset($_SESSION['ecole_id'])) {
-    setFlashMessage('error', 'Aucune école associée à votre compte.');
-    redirect('login.php');
-}
+// Détecter si c'est un visiteur
+$is_visitor = isset($_GET['visitor']) && $_GET['visitor'] == '1';
+$visitor_id = null;
 
-// Vérifier si l'utilisateur a les droits admin
-if ($_SESSION['user_role'] !== 'admin') {
-    setFlashMessage('error', 'Vous devez être administrateur pour configurer l\'école.');
-    redirect('dashboard.php');
+if ($is_visitor) {
+    // Détecter le visiteur
+    if (!isset($_COOKIE['naklass_visitor_id'])) {
+        $visitor_id = 'visitor_' . time() . '_' . rand(1000, 9999);
+        setcookie('naklass_visitor_id', $visitor_id, time() + (86400 * 365), '/');
+    } else {
+        $visitor_id = $_COOKIE['naklass_visitor_id'];
+    }
+} else {
+    // Vérifier si l'utilisateur est connecté
+    if (!isLoggedIn()) {
+        redirect('login.php');
+    }
+
+    // Vérifier si l'utilisateur a une école
+    if (!isset($_SESSION['ecole_id'])) {
+        setFlashMessage('error', 'Aucune école associée à votre compte.');
+        redirect('login.php');
+    }
+
+    // Vérifier si l'utilisateur a les droits admin
+    if ($_SESSION['user_role'] !== 'admin') {
+        setFlashMessage('error', 'Vous devez être administrateur pour configurer l\'école.');
+        redirect('dashboard.php');
+    }
 }
 
 // Vérifier si la configuration est déjà complète et validée par le super admin
 $database = new Database();
 $db = $database->getConnection();
+$ecole = null;
 
-try {
-    $query = "SELECT * FROM ecoles WHERE id = :ecole_id";
-    $stmt = $db->prepare($query);
-    $stmt->execute(['ecole_id' => $_SESSION['ecole_id']]);
-    $ecole = $stmt->fetch();
-    
-    if (!$ecole) {
-        setFlashMessage('error', 'École non trouvée.');
-        redirect('dashboard.php');
+if (!$is_visitor) {
+    try {
+        $query = "SELECT * FROM ecoles WHERE id = :ecole_id";
+        $stmt = $db->prepare($query);
+        $stmt->execute(['ecole_id' => $_SESSION['ecole_id']]);
+        $ecole = $stmt->fetch();
+        
+        if (!$ecole) {
+            setFlashMessage('error', 'École non trouvée.');
+            redirect('dashboard.php');
+        }
+        
+        // Vérifier si l'école est configurée et validée
+        $config_complete = false;
+        $super_admin_validated = false;
+        
+        if (array_key_exists('configuration_complete', $ecole)) {
+            $config_complete = $ecole['configuration_complete'];
+        }
+        if (array_key_exists('super_admin_validated', $ecole)) {
+            $super_admin_validated = $ecole['super_admin_validated'];
+        }
+        
+        // Si l'école est configurée et validée, rediriger vers le dashboard
+        if ($config_complete && $super_admin_validated) {
+            setFlashMessage('info', 'La configuration de votre école est déjà complète et validée.');
+            redirect('dashboard.php');
+        }
+        
+        // Si l'école est configurée mais pas encore validée par le super admin
+        if ($config_complete && !$super_admin_validated) {
+            setFlashMessage('info', 'Votre école est configurée et en attente de validation par le super administrateur.');
+            redirect('dashboard.php');
+        }
+        
+    } catch (Exception $e) {
+        // En cas d'erreur, continuer sans redirection pour éviter les boucles
+        error_log('Erreur lors de la vérification de l\'école: ' . $e->getMessage());
     }
-    
-    // Vérifier si l'école est configurée et validée
-    $config_complete = false;
-    $super_admin_validated = false;
-    
-    if (array_key_exists('configuration_complete', $ecole)) {
-        $config_complete = $ecole['configuration_complete'];
-    }
-    if (array_key_exists('super_admin_validated', $ecole)) {
-        $super_admin_validated = $ecole['super_admin_validated'];
-    }
-    
-    // Si l'école est configurée et validée, rediriger vers le dashboard
-    if ($config_complete && $super_admin_validated) {
-        setFlashMessage('info', 'La configuration de votre école est déjà complète et validée.');
-        redirect('dashboard.php');
-    }
-    
-    // Si l'école est configurée mais pas encore validée par le super admin
-    if ($config_complete && !$super_admin_validated) {
-        setFlashMessage('info', 'Votre école est configurée et en attente de validation par le super administrateur.');
-        redirect('dashboard.php');
-    }
-    
-} catch (Exception $e) {
-    // En cas d'erreur, continuer sans redirection pour éviter les boucles
-    error_log('Erreur lors de la vérification de l\'école: ' . $e->getMessage());
 }
 
 $error = '';
 $success = '';
+$school_created = false;
+$admin_credentials = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validation des données
-    $nom = sanitize($_POST['nom_ecole '] ?? '');
+    $nom = sanitize($_POST['nom'] ?? '');
     $sigle = sanitize($_POST['sigle'] ?? '');
     $adresse = sanitize($_POST['adresse'] ?? '');
     $telephone = sanitize($_POST['telephone'] ?? '');
@@ -84,106 +109,309 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $langue_enseignement = $_POST['langue_enseignement'] ?? [];
     $devise_principale = sanitize($_POST['devise_principale'] ?? '');
     $directeur_nom = sanitize($_POST['directeur_nom'] ?? '');
+    $directeur_prenom = sanitize($_POST['directeur_prenom'] ?? '');
     $directeur_telephone = sanitize($_POST['directeur_telephone'] ?? '');
     $directeur_email = sanitize($_POST['directeur_email'] ?? '');
     $numero_autorisation = sanitize($_POST['numero_autorisation'] ?? '');
     $date_autorisation = $_POST['date_autorisation'] ?? '';
     $description_etablissement = sanitize($_POST['description_etablissement'] ?? '');
     
+    // Pour les visiteurs, ajouter le mot de passe administrateur
+    $admin_password = '';
+    if ($is_visitor) {
+        $admin_password = sanitize($_POST['admin_password'] ?? '');
+    }
+    
     // Validation des champs obligatoires
-    if (empty($nom) || empty($sigle) || empty($adresse) || empty($telephone) || 
-        empty($email) || empty($regime) || empty($type_enseignement) || 
-        empty($langue_enseignement) || empty($devise_principale) || 
-        empty($directeur_nom) || empty($directeur_telephone)) {
-        $error = 'Veuillez remplir tous les champs obligatoires.';
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL) || 
-              (!empty($directeur_email) && !filter_var($directeur_email, FILTER_VALIDATE_EMAIL))) {
-        $error = 'Veuillez entrer des adresses email valides.';
-    } else {
+    $required_fields = [
+        'nom' => 'Nom de l\'école',
+        'sigle' => 'Sigle',
+        'adresse' => 'Adresse',
+        'telephone' => 'Téléphone',
+        'email' => 'Email',
+        'regime' => 'Régime',
+        'type_enseignement' => 'Type d\'enseignement',
+        'langue_enseignement' => 'Langue d\'enseignement',
+        'devise_principale' => 'Devise principale',
+        'directeur_nom' => 'Nom du directeur',
+        'directeur_telephone' => 'Téléphone du directeur'
+    ];
+    
+    // Pour les visiteurs, ajouter des champs supplémentaires
+    if ($is_visitor) {
+        $required_fields['directeur_prenom'] = 'Prénom du directeur';
+        $required_fields['directeur_email'] = 'Email du directeur';
+        $required_fields['admin_password'] = 'Mot de passe administrateur';
+    }
+    
+    foreach ($required_fields as $field => $label) {
+        if ($field === 'type_enseignement' || $field === 'langue_enseignement') {
+            if (empty($$field)) {
+                $error = "Le champ '$label' est obligatoire.";
+                break;
+            }
+        } elseif ($field === 'admin_password') {
+            if (strlen($$field) < 6) {
+                $error = "Le mot de passe doit contenir au moins 6 caractères.";
+                break;
+            }
+        } else {
+            if (empty($$field)) {
+                $error = "Le champ '$label' est obligatoire.";
+                break;
+            }
+        }
+    }
+    
+    // Validation des emails
+    if (empty($error)) {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = "L'adresse email de l'école n'est pas valide.";
+        } elseif (!empty($directeur_email) && !filter_var($directeur_email, FILTER_VALIDATE_EMAIL)) {
+            $error = "L'adresse email du directeur n'est pas valide.";
+        }
+    }
+    
+    // Vérifier l'unicité des emails pour les visiteurs
+    if (empty($error) && $is_visitor) {
         try {
-            // Mise à jour des informations de l'école
-            $updateQuery = "UPDATE ecoles SET 
-                            nom_ecole = :nom,
-                            sigle = :sigle,
-                            adresse = :adresse,
-                            telephone = :telephone,
-                            email = :email,
-                            site_web = :site_web,
-                            fax = :fax,
-                            bp = :bp,
-                            regime = :regime,
-                            type_enseignement = :type_enseignement,
-                            langue_enseignement = :langue_enseignement,
-                            devise_principale = :devise_principale,
-                            directeur_nom = :directeur_nom,
-                            directeur_telephone = :directeur_telephone,
-                            directeur_email = :directeur_email,
-                            numero_autorisation = :numero_autorisation,
-                            date_autorisation = :date_autorisation,
-                            description_etablissement = :description_etablissement,
-                            configuration_complete = TRUE,
-                            date_configuration = CURDATE(),
-                            updated_at = NOW(),
-                            updated_by = :updated_by
-                            WHERE id = :ecole_id";
+            // Vérifier si l'email de l'école existe déjà
+            $check_query = "SELECT COUNT(*) FROM ecoles WHERE email = :email";
+            $check_stmt = $db->prepare($check_query);
+            $check_stmt->execute(['email' => $email]);
+            if ($check_stmt->fetchColumn() > 0) {
+                $error = "Une école avec cet email existe déjà.";
+            }
             
-            $stmt = $db->prepare($updateQuery);
-            $result = $stmt->execute([
-                'nom_ecole' => $nom,
-                'sigle' => $sigle,
-                'adresse' => $adresse,
-                'telephone' => $telephone,
-                'email' => $email,
-                'site_web' => $site_web ?: null,
-                'fax' => $fax ?: null,
-                'bp' => $bp ?: null,
-                'regime' => $regime,
-                'type_enseignement' => implode(',', $type_enseignement),
-                'langue_enseignement' => implode(',', $langue_enseignement),
-                'devise_principale' => $devise_principale,
-                'directeur_nom' => $directeur_nom,
-                'directeur_telephone' => $directeur_telephone,
-                'directeur_email' => $directeur_email ?: null,
-                'numero_autorisation' => $numero_autorisation ?: null,
-                'date_autorisation' => $date_autorisation ?: null,
-                'description_etablissement' => $description_etablissement ?: null,
-                'updated_by' => $_SESSION['user_id'],
-                'ecole_id' => $_SESSION['ecole_id']
-            ]);
+            // Vérifier si l'email du directeur existe déjà comme utilisateur
+            if (empty($error) && !empty($directeur_email)) {
+                $check_user_query = "SELECT COUNT(*) FROM utilisateurs WHERE email = :email";
+                $check_user_stmt = $db->prepare($check_user_query);
+                $check_user_stmt->execute(['email' => $directeur_email]);
+                if ($check_user_stmt->fetchColumn() > 0) {
+                    $error = "Un utilisateur avec cet email existe déjà.";
+                }
+            }
+        } catch (Exception $e) {
+            $error = "Erreur lors de la vérification des emails : " . $e->getMessage();
+        }
+    }
+    
+    if (empty($error)) {
+        try {
+            $db->beginTransaction();
+            
+            if ($is_visitor) {
+                // Créer une nouvelle école pour le visiteur
+                $code_ecole = 'ECOLE_' . strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $nom), 0, 8)) . '_' . time();
+                
+                $insert_ecole_query = "INSERT INTO ecoles (
+                    nom_ecole, code_ecole, sigle, adresse, telephone, email, site_web, fax, bp,
+                    regime, type_enseignement, langue_enseignement, devise_principale,
+                    directeur_nom, directeur_telephone, directeur_email,
+                    numero_autorisation, date_autorisation, description_etablissement,
+                    type_etablissement, pays, fuseau_horaire, validation_status,
+                    created_by_visitor, date_creation_ecole, configuration_complete, date_configuration
+                ) VALUES (
+                    :nom_ecole, :code_ecole, :sigle, :adresse, :telephone, :email, :site_web, :fax, :bp,
+                    :regime, :type_enseignement, :langue_enseignement, :devise_principale,
+                    :directeur_nom, :directeur_telephone, :directeur_email,
+                    :numero_autorisation, :date_autorisation, :description_etablissement,
+                    'mixte', 'RD Congo', 'Africa/Kinshasa', 'approved',
+                    :visitor_id, NOW(), TRUE, NOW()
+                )";
+                
+                $stmt = $db->prepare($insert_ecole_query);
+                $result = $stmt->execute([
+                    'nom_ecole' => $nom,
+                    'code_ecole' => $code_ecole,
+                    'sigle' => $sigle,
+                    'adresse' => $adresse,
+                    'telephone' => $telephone,
+                    'email' => $email,
+                    'site_web' => $site_web ?: null,
+                    'fax' => $fax ?: null,
+                    'bp' => $bp ?: null,
+                    'regime' => $regime,
+                    'type_enseignement' => implode(',', $type_enseignement),
+                    'langue_enseignement' => implode(',', $langue_enseignement),
+                    'devise_principale' => $devise_principale,
+                    'directeur_nom' => $directeur_nom,
+                    'directeur_telephone' => $directeur_telephone,
+                    'directeur_email' => $directeur_email,
+                    'numero_autorisation' => $numero_autorisation ?: null,
+                    'date_autorisation' => $date_autorisation ?: null,
+                    'description_etablissement' => $description_etablissement ?: null,
+                    'visitor_id' => $visitor_id
+                ]);
+                
+                $ecole_id = $db->lastInsertId();
+                
+                // Créer le compte administrateur
+                $admin_username = 'admin_' . strtolower(substr(preg_replace('/[^A-Za-z0-9]/', '', $nom), 0, 6));
+                $admin_password_hash = password_hash($admin_password, PASSWORD_DEFAULT);
+                
+                $insert_admin_query = "INSERT INTO utilisateurs (
+                    ecole_id, role_id, nom, prenom, email, telephone, mot_de_passe_hash, actif
+                ) VALUES (
+                    :ecole_id, 1, :nom, :prenom, :email, :telephone, :mot_de_passe_hash, 1
+                )";
+                
+                $admin_stmt = $db->prepare($insert_admin_query);
+                $admin_stmt->execute([
+                    'ecole_id' => $ecole_id,
+                    'nom' => $directeur_nom,
+                    'prenom' => $directeur_prenom,
+                    'email' => $directeur_email,
+                    'telephone' => $directeur_telephone,
+                    'mot_de_passe_hash' => $admin_password_hash
+                ]);
+                
+                $admin_id = $db->lastInsertId();
+                
+                // Créer les niveaux par défaut
+                $niveaux_default = [
+                    ['nom' => 'Maternelle', 'description' => 'Petite section, Moyenne section, Grande section', 'ordre' => 1],
+                    ['nom' => 'Primaire', 'description' => 'CP, CE1, CE2, CM1, CM2', 'ordre' => 2],
+                    ['nom' => 'Collège', 'description' => '6ème, 5ème, 4ème, 3ème', 'ordre' => 3],
+                    ['nom' => 'Lycée', 'description' => 'Seconde, Première, Terminale', 'ordre' => 4]
+                ];
+                
+                foreach ($niveaux_default as $niveau) {
+                    $insert_niveau_query = "INSERT INTO niveaux (ecole_id, nom, description, ordre) VALUES (:ecole_id, :nom, :description, :ordre)";
+                    $niveau_stmt = $db->prepare($insert_niveau_query);
+                    $niveau_stmt->execute([
+                        'ecole_id' => $ecole_id,
+                        'nom' => $niveau['nom'],
+                        'description' => $niveau['description'],
+                        'ordre' => $niveau['ordre']
+                    ]);
+                }
+                
+                // Préparer les identifiants pour l'email
+                $admin_credentials = [
+                    'nom_utilisateur' => $admin_username,
+                    'mot_de_passe' => $admin_password,
+                    'email' => $directeur_email,
+                    'nom_ecole' => $nom,
+                    'code_ecole' => $code_ecole,
+                    'ecole_id' => $ecole_id
+                ];
+                
+            } else {
+                // Mise à jour des informations de l'école existante
+                $updateQuery = "UPDATE ecoles SET 
+                                nom_ecole = :nom,
+                                sigle = :sigle,
+                                adresse = :adresse,
+                                telephone = :telephone,
+                                email = :email,
+                                site_web = :site_web,
+                                fax = :fax,
+                                bp = :bp,
+                                regime = :regime,
+                                type_enseignement = :type_enseignement,
+                                langue_enseignement = :langue_enseignement,
+                                devise_principale = :devise_principale,
+                                directeur_nom = :directeur_nom,
+                                directeur_telephone = :directeur_telephone,
+                                directeur_email = :directeur_email,
+                                numero_autorisation = :numero_autorisation,
+                                date_autorisation = :date_autorisation,
+                                description_etablissement = :description_etablissement,
+                                configuration_complete = TRUE,
+                                date_configuration = CURDATE(),
+                                updated_at = NOW(),
+                                updated_by = :updated_by
+                                WHERE id = :ecole_id";
+                
+                $stmt = $db->prepare($updateQuery);
+                $result = $stmt->execute([
+                    'nom' => $nom,
+                    'sigle' => $sigle,
+                    'adresse' => $adresse,
+                    'telephone' => $telephone,
+                    'email' => $email,
+                    'site_web' => $site_web ?: null,
+                    'fax' => $fax ?: null,
+                    'bp' => $bp ?: null,
+                    'regime' => $regime,
+                    'type_enseignement' => implode(',', $type_enseignement),
+                    'langue_enseignement' => implode(',', $langue_enseignement),
+                    'devise_principale' => $devise_principale,
+                    'directeur_nom' => $directeur_nom,
+                    'directeur_telephone' => $directeur_telephone,
+                    'directeur_email' => $directeur_email ?: null,
+                    'numero_autorisation' => $numero_autorisation ?: null,
+                    'date_autorisation' => $date_autorisation ?: null,
+                    'description_etablissement' => $description_etablissement ?: null,
+                    'updated_by' => $_SESSION['user_id'],
+                    'ecole_id' => $_SESSION['ecole_id']
+                ]);
+            }
             
             if ($result) {
-                // Mettre à jour la session avec le nouveau nom de l'école
-                $_SESSION['ecole_nom'] = $nom;
+                $db->commit();
                 
-                // Log de l'action
-                logUserAction('SCHOOL_SETUP', 'Configuration initiale de l\'école complétée');
-                
-                // Créer une notification pour le super admin
-                $query = "INSERT INTO super_admin_notifications (type, ecole_id, message) 
-                         VALUES ('school_validation', :ecole_id, :message)";
-                $stmt = $db->prepare($query);
-                $stmt->execute([
-                    'ecole_id' => $_SESSION['ecole_id'],
-                    'message' => "École {$nom} configurée et en attente de validation"
-                ]);
-                
-                // Enregistrer dans l'historique
-                $query = "INSERT INTO school_validation_history (ecole_id, action, performed_by, notes) 
-                         VALUES (:ecole_id, 'configured', :admin_id, 'Configuration de l\'école complétée')";
-                $stmt = $db->prepare($query);
-                $stmt->execute([
-                    'ecole_id' => $_SESSION['ecole_id'],
-                    'admin_id' => $_SESSION['user_id']
-                ]);
-                
-                setFlashMessage('success', 'Configuration de votre école complétée avec succès ! 
-                               Votre école est maintenant en attente de validation par le super administrateur. 
-                               Vous recevrez une notification dès qu\'elle sera validée.');
-                redirect('dashboard.php');
+                if ($is_visitor) {
+                    // Envoyer l'email avec les identifiants pour les visiteurs
+                    try {
+                        require_once '../includes/EmailManager.php';
+                        $emailManager = new EmailManager();
+                        
+                        if ($emailManager->sendSchoolCreationWithCredentials($admin_credentials)) {
+                            $success = "✅ École créée avec succès !";
+                            $success .= "✅ Compte administrateur créé !";
+                            $success .= "✅ Identifiants envoyés par email !";
+                            $school_created = true;
+                            
+                            // Marquer le cookie pour indiquer qu'une école a été créée
+                            setcookie('naklass_ecole_created', 'true', time() + (86400 * 365), '/');
+                        } else {
+                            $success = "✅ École créée avec succès !";
+                            $success .= "✅ Compte administrateur créé !";
+                            $success .= "⚠️ Problème d'envoi d'email, mais vos identifiants sont affichés ci-dessous.";
+                            $school_created = true;
+                        }
+                    } catch (Exception $email_error) {
+                        $success = "✅ École créée avec succès !";
+                        $success .= "✅ Compte administrateur créé !";
+                        $success .= "⚠️ Problème d'envoi d'email : " . $email_error->getMessage();
+                        $school_created = true;
+                    }
+                } else {
+                    // Log de l'action pour les utilisateurs connectés
+                    logUserAction('SCHOOL_SETUP', 'Configuration initiale de l\'école complétée');
+                    
+                    // Créer une notification pour le super admin
+                    $query = "INSERT INTO super_admin_notifications (type, ecole_id, message) 
+                             VALUES ('school_validation', :ecole_id, :message)";
+                    $stmt = $db->prepare($query);
+                    $stmt->execute([
+                        'ecole_id' => $_SESSION['ecole_id'],
+                        'message' => "École {$nom} configurée et en attente de validation"
+                    ]);
+                    
+                    // Enregistrer dans l'historique
+                    $query = "INSERT INTO school_validation_history (ecole_id, action, performed_by, notes) 
+                             VALUES (:ecole_id, 'configured', :admin_id, 'Configuration de l\'école complétée')";
+                    $stmt = $db->prepare($query);
+                    $stmt->execute([
+                        'ecole_id' => $_SESSION['ecole_id'],
+                        'admin_id' => $_SESSION['user_id']
+                    ]);
+                    
+                    setFlashMessage('success', 'Configuration de votre école complétée avec succès ! 
+                                   Votre école est maintenant en attente de validation par le super administrateur. 
+                                   Vous recevrez une notification dès qu\'elle sera validée.');
+                    redirect('dashboard.php');
+                }
             } else {
+                $db->rollback();
                 $error = 'Erreur lors de la sauvegarde. Veuillez réessayer.';
             }
         } catch (Exception $e) {
+            $db->rollback();
             $error = 'Erreur système : ' . $e->getMessage();
         }
     }
@@ -192,7 +420,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Préremplir les données existantes si disponibles
 if ($ecole) {
     $current_data = [
-        'nom' => $ecole['nom'] ?? '',
+        'nom' => $ecole['nom_ecole'] ?? '',
         'sigle' => $ecole['sigle'] ?? '',
         'adresse' => $ecole['adresse'] ?? '',
         'telephone' => $ecole['telephone'] ?? '',
@@ -265,11 +493,19 @@ if ($ecole) {
                 <div class="mb-3">
                     <i class="bi bi-mortarboard-fill text-primary" style="font-size: 3rem;"></i>
                 </div>
-                <h2>Configuration de votre École</h2>
-                <p class="lead text-muted">
-                    Bienvenue dans Naklass ! Pour commencer à utiliser le système, 
-                    veuillez compléter les informations de votre établissement.
-                </p>
+                <?php if ($is_visitor): ?>
+                    <h2>Créer votre École</h2>
+                    <p class="lead text-muted">
+                        Bienvenue dans Naklass ! Créez votre établissement scolaire et obtenez immédiatement 
+                        vos identifiants d'administration.
+                    </p>
+                <?php else: ?>
+                    <h2>Configuration de votre École</h2>
+                    <p class="lead text-muted">
+                        Bienvenue dans Naklass ! Pour commencer à utiliser le système, 
+                        veuillez compléter les informations de votre établissement.
+                    </p>
+                <?php endif; ?>
                 <?php if (!array_key_exists('configuration_complete', $ecole ?: [])): ?>
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle me-2"></i>
@@ -285,6 +521,39 @@ if ($ecole) {
                     <i class="bi bi-exclamation-triangle-fill me-2"></i>
                     <?php echo htmlspecialchars($error); ?>
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+            
+            <?php if (!empty($success)): ?>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    <?php echo htmlspecialchars($success); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
+            
+            <?php if ($school_created && $admin_credentials): ?>
+                <div class="alert alert-success">
+                    <h5><i class="bi bi-key me-2"></i>Vos Identifiants d'Administration</h5>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Nom d'utilisateur :</strong><br>
+                            <code><?php echo htmlspecialchars($admin_credentials['nom_utilisateur']); ?></code>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Mot de passe :</strong><br>
+                            <code><?php echo htmlspecialchars($admin_credentials['mot_de_passe']); ?></code>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Code École :</strong><br>
+                            <code><?php echo htmlspecialchars($admin_credentials['code_ecole']); ?></code>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <a href="login.php" class="btn btn-primary">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Se connecter maintenant
+                        </a>
+                    </div>
                 </div>
             <?php endif; ?>
 
@@ -483,11 +752,22 @@ if ($ecole) {
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="directeur_nom" class="form-label required-label">Nom complet du directeur</label>
+                                <label for="directeur_nom" class="form-label required-label">Nom du directeur</label>
                                 <input type="text" class="form-control" id="directeur_nom" name="directeur_nom" 
                                        value="<?php echo htmlspecialchars($current_data['directeur_nom']); ?>" required>
                             </div>
                         </div>
+                        <?php if ($is_visitor): ?>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="directeur_prenom" class="form-label required-label">Prénom du directeur</label>
+                                <input type="text" class="form-control" id="directeur_prenom" name="directeur_prenom" 
+                                       value="<?php echo htmlspecialchars($current_data['directeur_prenom'] ?? ''); ?>" required>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="directeur_telephone" class="form-label required-label">Téléphone du directeur</label>
@@ -495,12 +775,27 @@ if ($ecole) {
                                        value="<?php echo htmlspecialchars($current_data['directeur_telephone']); ?>" required>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="directeur_email" class="form-label <?php echo $is_visitor ? 'required-label' : ''; ?>">Email du directeur</label>
+                                <input type="email" class="form-control" id="directeur_email" name="directeur_email" 
+                                       value="<?php echo htmlspecialchars($current_data['directeur_email']); ?>" 
+                                       <?php echo $is_visitor ? 'required' : ''; ?>>
+                                <?php if ($is_visitor): ?>
+                                <div class="form-text">Cet email recevra les identifiants d'administration</div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     </div>
+                    
+                    <?php if ($is_visitor): ?>
                     <div class="mb-3">
-                        <label for="directeur_email" class="form-label">Email du directeur</label>
-                        <input type="email" class="form-control" id="directeur_email" name="directeur_email" 
-                               value="<?php echo htmlspecialchars($current_data['directeur_email']); ?>">
+                        <label for="admin_password" class="form-label required-label">Mot de passe administrateur</label>
+                        <input type="password" class="form-control" id="admin_password" name="admin_password" 
+                               minlength="6" required>
+                        <div class="form-text">Minimum 6 caractères</div>
                     </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Autorisation officielle -->
@@ -527,9 +822,15 @@ if ($ecole) {
                 </div>
 
                 <div class="text-center mt-4">
-                    <button type="submit" class="btn btn-primary btn-lg px-5">
-                        <i class="bi bi-check-circle me-2"></i>Terminer la configuration
-                    </button>
+                    <?php if ($is_visitor): ?>
+                        <button type="submit" class="btn btn-primary btn-lg px-5">
+                            <i class="bi bi-building-add me-2"></i>Créer mon École
+                        </button>
+                    <?php else: ?>
+                        <button type="submit" class="btn btn-primary btn-lg px-5">
+                            <i class="bi bi-check-circle me-2"></i>Terminer la configuration
+                        </button>
+                    <?php endif; ?>
                 </div>
             </form>
         </div>
@@ -554,6 +855,16 @@ if ($ecole) {
                 alert('Veuillez sélectionner au moins une langue d\'enseignement.');
                 return false;
             }
+            
+            // Pour les visiteurs, vérifier le mot de passe
+            <?php if ($is_visitor): ?>
+            const adminPassword = document.getElementById('admin_password');
+            if (adminPassword && adminPassword.value.length < 6) {
+                e.preventDefault();
+                alert('Le mot de passe doit contenir au moins 6 caractères.');
+                return false;
+            }
+            <?php endif; ?>
         });
         
         // Auto-hide alerts

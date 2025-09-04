@@ -119,6 +119,15 @@ if (isset($_SESSION['ecole_id'])) {
         </li>
         <?php endif; ?>
         
+        <?php if (hasRole(['admin', 'direction', 'enseignant'])): ?>
+        <li class="menu-item <?php echo ($current_dir == 'emploi_du_temps') ? 'active' : ''; ?>">
+            <a href="../emploi_du_temps/" class="menu-link">
+                <i class="bi bi-calendar-week"></i>
+                <span>Emploi du Temps</span>
+            </a>
+        </li>
+        <?php endif; ?>
+        
         <?php if (hasRole(['enseignant'])): ?>
         <li class="menu-item <?php echo ($current_dir == 'classes' && $current_page == 'my_classes.php') ? 'active' : ''; ?>">
             <a href="../classes/my_classes.php" class="menu-link">

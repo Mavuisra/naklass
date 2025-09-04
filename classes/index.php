@@ -103,103 +103,137 @@ $page_title = "Gestion des Classes";
                     </a>
                 </div>
             <?php else: ?>
-                <div class="row g-4">
-                    <?php foreach ($classes as $classe): ?>
-                        <?php
-                        $capacity_percentage = $classe['capacite_max'] > 0 ? ($classe['nombre_eleves'] / $classe['capacite_max']) * 100 : 0;
-                        $capacity_class = 'bg-success';
-                        if ($capacity_percentage >= 80) $capacity_class = 'bg-danger';
-                        elseif ($capacity_percentage >= 60) $capacity_class = 'bg-warning';
-                        
-                        // Déterminer la couleur du cycle
-                        $cycle_colors = [
-                            'maternelle' => 'info',
-                            'primaire' => 'primary',
-                            'secondaire' => 'success',
-                            'supérieur' => 'warning'
-                        ];
-                        $cycle_color = $cycle_colors[$classe['cycle']] ?? 'secondary';
-                        ?>
-                        
-                        <div class="col-lg-4 col-md-6">
-                            <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0"><?php echo htmlspecialchars($classe['nom_classe']); ?></h5>
-                                    <span class="badge bg-<?php echo $classe['statut'] == 'actif' ? 'success' : 'secondary'; ?>">
-                                        <?php echo ucfirst($classe['statut']); ?>
-                                    </span>
-                                </div>
-                                <div class="card-body">
-                                    <div class="mb-3">
-                                        <div class="d-flex flex-wrap gap-1 mb-2">
-                                            <span class="badge bg-<?php echo $cycle_color; ?>">
-                                                <?php echo ucfirst($classe['cycle']); ?>
-                                            </span>
-                                            <span class="badge bg-outline-secondary">
-                                                <?php echo htmlspecialchars($classe['niveau']); ?>
-                                            </span>
-                                            <span class="badge bg-outline-info">
-                                                <?php echo htmlspecialchars($classe['annee_scolaire']); ?>
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <small class="text-muted">Élèves inscrits</small>
-                                            <small class="fw-bold">
-                                                <?php echo $classe['nombre_eleves']; ?>
-                                                <?php if ($classe['capacite_max'] > 0): ?>
-                                                    / <?php echo $classe['capacite_max']; ?>
-                                                <?php endif; ?>
-                                            </small>
-                                        </div>
+                <!-- Tableau des classes -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-table me-2"></i>
+                            Liste des Classes
+                        </h5>
+                        <span class="badge bg-primary"><?php echo count($classes); ?> classe(s)</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nom de la Classe</th>
+                                        <th>Cycle</th>
+                                        <th>Niveau</th>
+                                        <th>Année Scolaire</th>
+                                        <th>Élèves</th>
+                                        <th>Capacité</th>
+                                        <th>Salle</th>
+                                        <th>Statut</th>
+                                        <th>Créée le</th>
+                                        <th width="140">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($classes as $classe): ?>
+                                        <?php
+                                        $capacity_percentage = $classe['capacite_max'] > 0 ? ($classe['nombre_eleves'] / $classe['capacite_max']) * 100 : 0;
+                                        $capacity_class = 'bg-success';
+                                        if ($capacity_percentage >= 80) $capacity_class = 'bg-danger';
+                                        elseif ($capacity_percentage >= 60) $capacity_class = 'bg-warning';
                                         
-                                        <?php if ($classe['capacite_max'] > 0): ?>
-                                            <div class="progress" style="height: 8px;">
-                                                <div class="progress-bar <?php echo $capacity_class; ?>" 
-                                                     style="width: <?php echo min(100, $capacity_percentage); ?>%"></div>
-                                            </div>
+                                        // Déterminer la couleur du cycle
+                                        $cycle_colors = [
+                                            'maternelle' => 'info',
+                                            'primaire' => 'primary',
+                                            'secondaire' => 'success',
+                                            'supérieur' => 'warning'
+                                        ];
+                                        $cycle_color = $cycle_colors[$classe['cycle']] ?? 'secondary';
+                                        ?>
+                                        <tr>
+                                            <td>
+                                                <strong><?php echo htmlspecialchars($classe['nom_classe']); ?></strong>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-<?php echo $cycle_color; ?>">
+                                                    <?php echo ucfirst($classe['cycle']); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-outline-secondary">
+                                                    <?php echo htmlspecialchars($classe['niveau']); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-outline-info">
+                                                    <?php echo htmlspecialchars($classe['annee_scolaire']); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <strong><?php echo $classe['nombre_eleves']; ?></strong>
+                                            </td>
+                                            <td>
+                                                <?php if ($classe['capacite_max'] > 0): ?>
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="progress me-2" style="width: 60px; height: 8px;">
+                                                            <div class="progress-bar <?php echo $capacity_class; ?>" 
+                                                                 style="width: <?php echo min(100, $capacity_percentage); ?>%"></div>
+                                                        </div>
+                                                        <small class="text-muted">
+                                                            <?php echo $classe['nombre_eleves']; ?>/<?php echo $classe['capacite_max']; ?>
+                                                        </small>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <span class="text-muted">Illimitée</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if (!empty($classe['salle_classe'])): ?>
+                                                    <i class="bi bi-geo-alt me-1"></i>
+                                                    <?php echo htmlspecialchars($classe['salle_classe']); ?>
+                                                <?php else: ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-<?php echo $classe['statut'] == 'actif' ? 'success' : 'secondary'; ?>">
+                                                    <?php echo ucfirst($classe['statut']); ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    <?php echo date('d/m/Y', strtotime($classe['created_at'])); ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <a href="view.php?id=<?php echo $classe['id']; ?>" 
+                                                       class="btn btn-outline-info btn-sm" title="Voir">
+                                                        <i class="bi bi-eye"></i>
+                                                    </a>
+                                                    <a href="edit.php?id=<?php echo $classe['id']; ?>" 
+                                                       class="btn btn-outline-primary btn-sm" title="Modifier">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                    <a href="students.php?class_id=<?php echo $classe['id']; ?>" 
+                                                       class="btn btn-outline-success btn-sm" title="Élèves">
+                                                        <i class="bi bi-people"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        
+                                        <?php if (!empty($classe['notes_internes'])): ?>
+                                            <tr class="table-light">
+                                                <td colspan="10" class="py-2">
+                                                    <small class="text-muted">
+                                                        <i class="bi bi-chat-text me-1"></i>
+                                                        <strong>Notes :</strong> <?php echo htmlspecialchars($classe['notes_internes']); ?>
+                                                    </small>
+                                                </td>
+                                            </tr>
                                         <?php endif; ?>
-                                    </div>
-                                    
-                                    <?php if ($classe['salle_classe']): ?>
-                                        <p class="card-text small text-muted mb-2">
-                                            <i class="bi bi-geo-alt me-1"></i>
-                                            Salle: <?php echo htmlspecialchars($classe['salle_classe']); ?>
-                                        </p>
-                                    <?php endif; ?>
-                                    
-                                    <?php if ($classe['notes_internes']): ?>
-                                        <p class="card-text small text-muted">
-                                            <?php echo htmlspecialchars(substr($classe['notes_internes'], 0, 100)) . (strlen($classe['notes_internes']) > 100 ? '...' : ''); ?>
-                                        </p>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="card-footer">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <small class="text-muted">
-                                            Créée le <?php echo date('d/m/Y', strtotime($classe['created_at'])); ?>
-                                        </small>
-                                        <div class="btn-group btn-group-sm">
-                                            <a href="view.php?id=<?php echo $classe['id']; ?>" 
-                                               class="btn btn-outline-info" title="Voir">
-                                                <i class="bi bi-eye"></i>
-                                            </a>
-                                            <a href="edit.php?id=<?php echo $classe['id']; ?>" 
-                                               class="btn btn-outline-primary" title="Modifier">
-                                                <i class="bi bi-pencil"></i>
-                                            </a>
-                                            <a href="students.php?class_id=<?php echo $classe['id']; ?>" 
-                                               class="btn btn-outline-success" title="Élèves">
-                                                <i class="bi bi-people"></i>
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
                         </div>
-                    <?php endforeach; ?>
+                    </div>
                 </div>
             <?php endif; ?>
         </div>

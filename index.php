@@ -33,16 +33,16 @@ if (isLoggedIn()) {
 } else {
     // Vérifier si c'est un nouveau visiteur
     if ($is_new_visitor) {
-        // Rediriger automatiquement vers la configuration d'école
-        redirect('visitor_school_setup.php');
+        // Rediriger automatiquement vers la création d'école
+        redirect('auth/school_setup.php?visitor=1');
     } else {
         // Vérifier si le visiteur a déjà créé une école
         if (isset($_COOKIE['naklass_ecole_created'])) {
             // Le visiteur a déjà créé une école, rediriger vers la connexion
             redirect('auth/login.php');
         } else {
-            // Visiteur existant sans école, rediriger vers la configuration
-            redirect('visitor_school_setup.php');
+            // Visiteur existant sans école, rediriger vers la création d'école
+            redirect('auth/school_setup.php?visitor=1');
         }
     }
 }

@@ -1,12 +1,11 @@
 # Fichiers de configuration sensibles
-config/database.php
-config/email.php
+
 .env
 
 # Dossiers d'uploads et de logs
 uploads/
 logs/
-vendor/
+
 
 # Fichiers temporaires
 *.tmp
@@ -40,6 +39,7 @@ Thumbs.db
 
 # Fichiers de test
 test_*.php
+test_*.html
 debug_*.php
 
 # Fichiers de configuration XAMPP

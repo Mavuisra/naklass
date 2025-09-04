@@ -53,7 +53,11 @@ $stats = [
     'active_users' => 0,
     'total_students' => 0,
     'total_teachers' => 0,
-    'total_classes' => 0
+    'total_classes' => 0,
+    'total_courses' => 0,
+    'total_inscriptions' => 0,
+    'total_emploi_temps' => 0,
+    'total_finance_records' => 0
 ];
 
 if ($ecole) {
@@ -70,8 +74,8 @@ if ($ecole) {
         $stmt->execute(['ecole_id' => $ecole_id]);
         $stats['active_users'] = $stmt->fetch()['total'];
         
-        // Compter les étudiants
-        $query = "SELECT COUNT(*) as total FROM etudiants WHERE ecole_id = :ecole_id";
+        // Compter les élèves
+        $query = "SELECT COUNT(*) as total FROM eleves WHERE ecole_id = :ecole_id";
         $stmt = $db->prepare($query);
         $stmt->execute(['ecole_id' => $ecole_id]);
         $stats['total_students'] = $stmt->fetch()['total'];
@@ -87,6 +91,32 @@ if ($ecole) {
         $stmt = $db->prepare($query);
         $stmt->execute(['ecole_id' => $ecole_id]);
         $stats['total_classes'] = $stmt->fetch()['total'];
+        
+        // Compter les cours
+        $query = "SELECT COUNT(*) as total FROM cours WHERE ecole_id = :ecole_id";
+        $stmt = $db->prepare($query);
+        $stmt->execute(['ecole_id' => $ecole_id]);
+        $stats['total_courses'] = $stmt->fetch()['total'];
+        
+        // Compter les inscriptions (via les classes)
+        $query = "SELECT COUNT(*) as total FROM inscriptions i 
+                  INNER JOIN classes c ON i.classe_id = c.id 
+                  WHERE c.ecole_id = :ecole_id";
+        $stmt = $db->prepare($query);
+        $stmt->execute(['ecole_id' => $ecole_id]);
+        $stats['total_inscriptions'] = $stmt->fetch()['total'];
+        
+        // Compter les emplois du temps
+        $query = "SELECT COUNT(*) as total FROM emploi_du_temps WHERE ecole_id = :ecole_id";
+        $stmt = $db->prepare($query);
+        $stmt->execute(['ecole_id' => $ecole_id]);
+        $stats['total_emploi_temps'] = $stmt->fetch()['total'];
+        
+        // Compter les enregistrements financiers
+        $query = "SELECT COUNT(*) as total FROM paiements WHERE ecole_id = :ecole_id";
+        $stmt = $db->prepare($query);
+        $stmt->execute(['ecole_id' => $ecole_id]);
+        $stats['total_finance_records'] = $stmt->fetch()['total'];
         
     } catch (Exception $e) {
         // Ignorer les erreurs si les tables n'existent pas encore
@@ -234,6 +264,7 @@ if ($ecole) {
             <?php if ($ecole): ?>
                 <!-- Cartes de statistiques -->
                 <div class="row g-4 mb-4">
+                    <!-- Statistiques principales -->
                     <div class="col-xl-3 col-md-6">
                         <div class="stat-card stats-card">
                             <div class="stat-icon bg-white bg-opacity-25">
@@ -273,7 +304,20 @@ if ($ecole) {
                     <div class="col-xl-3 col-md-6">
                         <div class="stat-card">
                             <div class="stat-icon bg-warning">
-                                <i class="bi bi-book"></i>
+                                <i class="bi bi-person-badge"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3><?php echo number_format($stats['total_teachers']); ?></h3>
+                                <p>Enseignants</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Statistiques académiques -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-primary">
+                                <i class="bi bi-building"></i>
                             </div>
                             <div class="stat-content">
                                 <h3><?php echo number_format($stats['total_classes']); ?></h3>
@@ -281,56 +325,58 @@ if ($ecole) {
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                <!-- Actions rapides -->
-                <div class="row g-4 mb-4">
-                    <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="mb-0"><i class="bi bi-lightning me-2"></i>Actions rapides</h5>
+                    
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-secondary">
+                                <i class="bi bi-book"></i>
                             </div>
-                            <div class="card-body">
-                                <div class="d-flex gap-3 flex-wrap">
-                                    <a href="edit.php?id=<?php echo $ecole['id']; ?>" class="btn btn-primary">
-                                        <i class="bi bi-pencil me-2"></i>Modifier l'école
-                                    </a>
-                                    
-                                    <?php if (!$ecole['admin_nom']): ?>
-                                        <a href="../users/create-admin.php?ecole_id=<?php echo $ecole['id']; ?>" class="btn btn-success">
-                                            <i class="bi bi-person-plus me-2"></i>Créer un admin
-                                        </a>
-                                    <?php endif; ?>
-                                    
-                                    <?php if (isset($ecole['activee'])): ?>
-                                        <?php if ($ecole['activee']): ?>
-                                            <form method="POST" style="display: inline;">
-                                                <input type="hidden" name="action" value="deactivate">
-                                                <input type="hidden" name="ecole_id" value="<?php echo $ecole['id']; ?>">
-                                                <button type="submit" class="btn btn-warning" 
-                                                        onclick="return confirm('Êtes-vous sûr de vouloir désactiver cette école ?')">
-                                                    <i class="bi bi-pause me-2"></i>Désactiver
-                                                </button>
-                                            </form>
-                                        <?php else: ?>
-                                            <form method="POST" style="display: inline;">
-                                                <input type="hidden" name="action" value="activate">
-                                                <input type="hidden" name="ecole_id" value="<?php echo $ecole['id']; ?>">
-                                                <button type="submit" class="btn btn-success">
-                                                    <i class="bi bi-play me-2"></i>Activer
-                                                </button>
-                                            </form>
-                                        <?php endif; ?>
-                                    <?php endif; ?>
-                                    
-                                    <button class="btn btn-outline-secondary" onclick="window.print()">
-                                        <i class="bi bi-printer me-2"></i>Imprimer
-                                    </button>
-                                </div>
+                            <div class="stat-content">
+                                <h3><?php echo number_format($stats['total_courses']); ?></h3>
+                                <p>Cours</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-dark">
+                                <i class="bi bi-clipboard-check"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3><?php echo number_format($stats['total_inscriptions']); ?></h3>
+                                <p>Inscriptions</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-info">
+                                <i class="bi bi-calendar-week"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3><?php echo number_format($stats['total_emploi_temps']); ?></h3>
+                                <p>Emplois du Temps</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Statistiques financières -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-success">
+                                <i class="bi bi-cash-coin"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h3><?php echo number_format($stats['total_finance_records']); ?></h3>
+                                <p>Paiements</p>
                             </div>
                         </div>
                     </div>
                 </div>
+                
+
                 
                 <!-- Informations détaillées -->
                 <div class="row g-4">
@@ -678,6 +724,80 @@ if ($ecole) {
                                 <div class="detail-row">
                                     <div class="row">
                                         <div class="col-md-4">
+                                            <span class="detail-label">Logo :</span>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <?php if ($ecole['logo_path']): ?>
+                                                <img src="../../<?php echo htmlspecialchars($ecole['logo_path']); ?>" 
+                                                     alt="Logo de l'école" class="img-thumbnail" style="max-width: 100px; max-height: 100px;">
+                                            <?php else: ?>
+                                                <span class="empty-value">Aucun logo</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="detail-row">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <span class="detail-label">Statut :</span>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <span class="badge bg-<?php echo $ecole['statut'] === 'actif' ? 'success' : ($ecole['statut'] === 'archivé' ? 'warning' : 'danger'); ?>">
+                                                <?php echo ucfirst($ecole['statut']); ?>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="detail-row">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <span class="detail-label">Options secondaire :</span>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <?php if ($ecole['options_secondaire']): ?>
+                                                <span class="detail-value"><?php echo htmlspecialchars($ecole['options_secondaire']); ?></span>
+                                            <?php else: ?>
+                                                <span class="empty-value">Non renseigné</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="detail-row">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <span class="detail-label">Sections humanités :</span>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <?php if ($ecole['sections_humanites']): ?>
+                                                <span class="detail-value"><?php echo htmlspecialchars($ecole['sections_humanites']); ?></span>
+                                            <?php else: ?>
+                                                <span class="empty-value">Non renseigné</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="detail-row">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <span class="detail-label">Notes de validation :</span>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <?php if ($ecole['validation_notes']): ?>
+                                                <span class="detail-value"><?php echo nl2br(htmlspecialchars($ecole['validation_notes'])); ?></span>
+                                            <?php else: ?>
+                                                <span class="empty-value">Aucune note</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="detail-row">
+                                    <div class="row">
+                                        <div class="col-md-4">
                                             <span class="detail-label">Date de création :</span>
                                         </div>
                                         <div class="col-md-8">
@@ -697,6 +817,36 @@ if ($ecole) {
                                             <span class="detail-value">
                                                 <?php echo date('d/m/Y à H:i', strtotime($ecole['updated_at'] ?? 'now')); ?>
                                             </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="detail-row">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <span class="detail-label">Créé par :</span>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <?php if ($ecole['created_by']): ?>
+                                                <span class="detail-value">Utilisateur #<?php echo $ecole['created_by']; ?></span>
+                                            <?php else: ?>
+                                                <span class="empty-value">Non spécifié</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="detail-row">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <span class="detail-label">Mis à jour par :</span>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <?php if ($ecole['updated_by']): ?>
+                                                <span class="detail-value">Utilisateur #<?php echo $ecole['updated_by']; ?></span>
+                                            <?php else: ?>
+                                                <span class="empty-value">Non spécifié</span>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
                                 </div>
@@ -833,6 +983,86 @@ if ($ecole) {
                                     <label class="form-label">ID de l'école :</label>
                                     <div>
                                         <code class="bg-light px-2 py-1 rounded"><?php echo $ecole['id']; ?></code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Informations d'activation -->
+                        <div class="card info-card mt-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-power me-2"></i>
+                                    Activation et Gestion
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Statut d'activation :</label>
+                                    <div>
+                                        <?php if (isset($ecole['activee'])): ?>
+                                            <span class="status-badge status-<?php echo $ecole['activee'] ? 'active' : 'inactive'; ?>">
+                                                <?php echo $ecole['activee'] ? 'Active' : 'Inactive'; ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-muted">Non défini</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Date d'activation :</label>
+                                    <div>
+                                        <?php if ($ecole['date_activation']): ?>
+                                            <small class="text-muted"><?php echo date('d/m/Y à H:i', strtotime($ecole['date_activation'])); ?></small>
+                                        <?php else: ?>
+                                            <span class="text-muted">Non activée</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Activée par :</label>
+                                    <div>
+                                        <?php if ($ecole['activee_par']): ?>
+                                            <span class="badge bg-info">Utilisateur #<?php echo $ecole['activee_par']; ?></span>
+                                        <?php else: ?>
+                                            <span class="text-muted">Non spécifié</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Actions disponibles :</label>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <?php if (isset($ecole['activee'])): ?>
+                                            <?php if ($ecole['activee']): ?>
+                                                <form method="POST" style="display: inline;">
+                                                    <input type="hidden" name="action" value="deactivate">
+                                                    <input type="hidden" name="ecole_id" value="<?php echo $ecole['id']; ?>">
+                                                    <button type="submit" class="btn btn-warning btn-sm" 
+                                                            onclick="return confirm('Êtes-vous sûr de vouloir désactiver cette école ?')">
+                                                        <i class="bi bi-pause me-1"></i>Désactiver
+                                                    </button>
+                                                </form>
+                                            <?php else: ?>
+                                                <form method="POST" style="display: inline;">
+                                                    <input type="hidden" name="action" value="activate">
+                                                    <input type="hidden" name="ecole_id" value="<?php echo $ecole['id']; ?>">
+                                                    <button type="submit" class="btn btn-success btn-sm">
+                                                        <i class="bi bi-play me-1"></i>Activer
+                                                    </button>
+                                                </form>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                        
+                                        <a href="edit.php?id=<?php echo $ecole['id']; ?>" class="btn btn-primary btn-sm">
+                                            <i class="bi bi-pencil me-1"></i>Modifier
+                                        </a>
+                                        
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                                            <i class="bi bi-printer me-1"></i>Imprimer
+                                        </button>
                                     </div>
                                 </div>
                             </div>

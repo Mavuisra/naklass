@@ -45,9 +45,9 @@ $where_clause = implode(' AND ', $where_conditions);
 $count_query = "SELECT COUNT(DISTINCT e.id) as total 
                 FROM eleves e 
                 LEFT JOIN (
-                    SELECT eleve_id, classe_id, annee_scolaire, statut
+                    SELECT eleve_id, classe_id, annee_scolaire, statut_inscription
                     FROM inscriptions 
-                    WHERE statut IN ('validée', 'en_cours')
+                    WHERE statut_inscription IN ('validée', 'en_cours')
                     ORDER BY created_at DESC
                 ) i ON e.id = i.eleve_id
                 LEFT JOIN classes c ON i.classe_id = c.id
@@ -62,12 +62,13 @@ $total_pages = ceil($total_students / $limit);
 $query = "SELECT DISTINCT e.*, 
                  c.nom_classe, c.niveau, c.cycle,
                  i.annee_scolaire,
+                 i.statut_inscription as statut_inscription,
                  COUNT(DISTINCT t.id) as nb_tuteurs
           FROM eleves e 
           LEFT JOIN (
-              SELECT eleve_id, classe_id, annee_scolaire, statut
+              SELECT eleve_id, classe_id, annee_scolaire, statut_inscription
               FROM inscriptions 
-              WHERE statut IN ('validée', 'en_cours')
+              WHERE statut_inscription IN ('validée', 'en_cours')
               ORDER BY created_at DESC
           ) i ON e.id = i.eleve_id
           LEFT JOIN classes c ON i.classe_id = c.id
@@ -134,9 +135,11 @@ $page_title = "Gestion des Élèves";
                         <i class="bi bi-download me-2"></i>Exporter
                     </button>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="export.php?format=excel"><i class="bi bi-file-earmark-excel me-2"></i>Excel</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="showExportModal()"><i class="bi bi-file-earmark-excel me-2"></i>Excel avec filtres</a></li>
+                        <li><a class="dropdown-item" href="export_excel.php"><i class="bi bi-file-earmark-excel me-2"></i>Excel (tous les élèves)</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="showExportCSVModal()"><i class="bi bi-file-earmark-text me-2"></i>CSV avec filtres</a></li>
+                        <li><a class="dropdown-item" href="export_csv.php"><i class="bi bi-file-earmark-text me-2"></i>CSV (tous les élèves)</a></li>
                         <li><a class="dropdown-item" href="export.php?format=pdf"><i class="bi bi-file-earmark-pdf me-2"></i>PDF</a></li>
-                        <li><a class="dropdown-item" href="export.php?format=csv"><i class="bi bi-file-earmark-text me-2"></i>CSV</a></li>
                     </ul>
                 </div>
             </div>
@@ -382,9 +385,13 @@ $page_title = "Gestion des Élèves";
                                                     'diplômé' => 'bg-primary',
                                                     'abandonné' => 'bg-secondary'
                                                 ];
+                                                
+                                                // Utiliser le statut de l'inscription si disponible, sinon le statut scolaire
+                                                $statut_a_afficher = $student['statut_inscription'] ?? $student['statut_scolaire'] ?? 'Non inscrit';
+                                                $statut_key = strtolower($statut_a_afficher);
                                                 ?>
-                                                <span class="badge <?php echo $statut_class[$student['statut_scolaire']] ?? 'bg-secondary'; ?>">
-                                                    <?php echo ucfirst($student['statut_scolaire']); ?>
+                                                <span class="badge <?php echo $statut_class[$statut_key] ?? 'bg-secondary'; ?>">
+                                                    <?php echo ucfirst($statut_a_afficher); ?>
                                                 </span>
                                             </td>
                                             <td>
@@ -543,6 +550,187 @@ $page_title = "Gestion des Élèves";
                     });
                 }
             );
+        });
+    </script>
+
+    <!-- Modal d'exportation Excel avec filtres -->
+    <div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exportModalLabel">
+                        <i class="bi bi-file-earmark-excel me-2"></i>Exporter les Élèves en Excel
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="exportForm" method="GET" action="export_excel.php">
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Sélectionnez les critères d'exportation. Laissez vide pour exporter tous les élèves.
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="exportClasse" class="form-label">Classe</label>
+                            <select class="form-select" id="exportClasse" name="classe_id">
+                                <option value="">Toutes les classes</option>
+                                <?php
+                                $classes_query = "SELECT id, nom_classe FROM classes WHERE ecole_id = :ecole_id AND statut = 'actif' ORDER BY nom_classe";
+                                $stmt = $db->prepare($classes_query);
+                                $stmt->execute(['ecole_id' => $_SESSION['ecole_id']]);
+                                $classes = $stmt->fetchAll();
+                                
+                                foreach ($classes as $classe) {
+                                    $selected = ($classe_filter == $classe['id']) ? 'selected' : '';
+                                    echo "<option value=\"{$classe['id']}\" $selected>{$classe['nom_classe']}</option>";
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="exportStatut" class="form-label">Statut d'inscription</label>
+                            <select class="form-select" id="exportStatut" name="statut">
+                                <option value="">Tous les statuts</option>
+                                <option value="validée" <?php echo ($statut_filter == 'validée') ? 'selected' : ''; ?>>Validée</option>
+                                <option value="en_cours" <?php echo ($statut_filter == 'en_cours') ? 'selected' : ''; ?>>En cours</option>
+                                <option value="annulée" <?php echo ($statut_filter == 'annulée') ? 'selected' : ''; ?>>Annulée</option>
+                                <option value="archivé" <?php echo ($statut_filter == 'archivé') ? 'selected' : ''; ?>>Archivé</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="exportAnnee" class="form-label">Année scolaire</label>
+                            <select class="form-select" id="exportAnnee" name="annee_scolaire">
+                                <option value="">Toutes les années</option>
+                                <?php
+                                $annees_query = "SELECT DISTINCT annee_scolaire FROM inscriptions WHERE ecole_id = :ecole_id ORDER BY annee_scolaire DESC";
+                                $stmt = $db->prepare($annees_query);
+                                $stmt->execute(['ecole_id' => $_SESSION['ecole_id']]);
+                                $annees = $stmt->fetchAll();
+                                
+                                foreach ($annees as $annee) {
+                                    echo "<option value=\"{$annee['annee_scolaire']}\">{$annee['annee_scolaire']}</option>";
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeInactive" name="include_inactive">
+                            <label class="form-check-label" for="includeInactive">
+                                Inclure les élèves inactifs
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-download me-2"></i>Exporter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal d'exportation CSV avec filtres -->
+    <div class="modal fade" id="exportCSVModal" tabindex="-1" aria-labelledby="exportCSVModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exportCSVModalLabel">
+                        <i class="bi bi-file-earmark-text me-2"></i>Exporter les Élèves en CSV
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="exportCSVForm" method="GET" action="export_csv.php">
+                    <div class="modal-body">
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle me-2"></i>
+                            <strong>Format CSV recommandé</strong> - Compatible Excel, fonctionne sans extensions supplémentaires.
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="exportCSVClasse" class="form-label">Classe</label>
+                            <select class="form-select" id="exportCSVClasse" name="classe_id">
+                                <option value="">Toutes les classes</option>
+                                <?php
+                                $classes_query = "SELECT id, nom_classe FROM classes WHERE ecole_id = :ecole_id AND statut = 'actif' ORDER BY nom_classe";
+                                $stmt = $db->prepare($classes_query);
+                                $stmt->execute(['ecole_id' => $_SESSION['ecole_id']]);
+                                $classes = $stmt->fetchAll();
+                                
+                                foreach ($classes as $classe) {
+                                    $selected = ($classe_filter == $classe['id']) ? 'selected' : '';
+                                    echo "<option value=\"{$classe['id']}\" $selected>{$classe['nom_classe']}</option>";
+                                }
+                                ?>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="exportCSVStatut" class="form-label">Statut d'inscription</label>
+                            <select class="form-select" id="exportCSVStatut" name="statut">
+                                <option value="">Tous les statuts</option>
+                                <option value="validée" <?php echo ($statut_filter == 'validée') ? 'selected' : ''; ?>>Validée</option>
+                                <option value="en_cours" <?php echo ($statut_filter == 'en_cours') ? 'selected' : ''; ?>>En cours</option>
+                                <option value="annulée" <?php echo ($statut_filter == 'annulée') ? 'selected' : ''; ?>>Annulée</option>
+                                <option value="archivé" <?php echo ($statut_filter == 'archivé') ? 'selected' : ''; ?>>Archivé</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="exportCSVAnnee" class="form-label">Année scolaire</label>
+                            <select class="form-select" id="exportCSVAnnee" name="annee_scolaire">
+                                <option value="">Toutes les années</option>
+                                <?php
+                                $annees_query = "SELECT DISTINCT annee_scolaire FROM inscriptions WHERE ecole_id = :ecole_id ORDER BY annee_scolaire DESC";
+                                $stmt = $db->prepare($annees_query);
+                                $stmt->execute(['ecole_id' => $_SESSION['ecole_id']]);
+                                $annees = $stmt->fetchAll();
+                                
+                                foreach ($annees as $annee) {
+                                    echo "<option value=\"{$annee['annee_scolaire']}\">{$annee['annee_scolaire']}</option>";
+                                }
+                                ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-download me-2"></i>Exporter CSV
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showExportModal() {
+            var exportModal = new bootstrap.Modal(document.getElementById('exportModal'));
+            exportModal.show();
+        }
+        
+        function showExportCSVModal() {
+            var exportCSVModal = new bootstrap.Modal(document.getElementById('exportCSVModal'));
+            exportCSVModal.show();
+        }
+        
+        // Pré-remplir les filtres actuels
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentClasse = urlParams.get('classe');
+            const currentStatut = urlParams.get('statut');
+            
+            if (currentClasse) {
+                document.getElementById('exportClasse').value = currentClasse;
+            }
+            if (currentStatut) {
+                document.getElementById('exportStatut').value = currentStatut;
+            }
         });
     </script>
 </body>
