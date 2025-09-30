@@ -231,15 +231,15 @@ function sanitize($data) {
         
         .success-message {
             background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-            border: 1px solid #c3e6cb;
+            border: 1px solidrgba(14, 66, 236, 0.46);
             border-radius: 12px;
             padding: 2rem;
             margin-bottom: 2rem;
-            color: #155724;
+            color:rgb(51, 133, 174);
         }
         
         .success-message strong {
-            color: #0f5132;
+            color:rgb(9, 127, 217);
         }
         
         .form-section {
@@ -419,9 +419,7 @@ function sanitize($data) {
                                 <i class="bi bi-building me-2"></i>
                                 Configuration d'École
                             </h3>
-                            <p class="lead text-muted">
-                                Créez votre établissement scolaire en quelques étapes simples
-                            </p>
+                        
                         </div>
                         
                         <?php if ($is_new_visitor): ?>

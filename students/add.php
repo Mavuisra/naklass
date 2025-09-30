@@ -450,6 +450,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Log de l'action
             logUserAction('CREATE_STUDENT', "Inscription de l'élève: $matricule - {$data['nom']} {$data['prenom']}");
             
+            // 🔔 NOTIFICATION: Nouvel élève inscrit
+            try {
+                require_once '../includes/NotificationManager.php';
+                $notificationManager = new NotificationManager();
+                
+                // Récupérer les détails de la classe
+                $classe_details = "SELECT nom_classe, niveau, cycle FROM classes WHERE id = :classe_id";
+                $stmt = $db->prepare($classe_details);
+                $stmt->execute(['classe_id' => $data['classe_id']]);
+                $classe_info = $stmt->fetch();
+                
+                // Notification pour l'administrateur qui a inscrit l'élève
+                require_once '../includes/notification_links.php';
+                $notificationManager->createNotificationFromTemplate('student_registered', [
+                    'student_name' => $data['prenom'] . ' ' . $data['nom'],
+                    'class_name' => $classe_info['nom_classe'],
+                    'matricule' => $matricule,
+                    'niveau' => $classe_info['niveau'],
+                    'cycle' => $classe_info['cycle'],
+                    'student_id' => $eleve_id
+                ], [
+                    'priority' => 'normal',
+                    'channels' => ['web'],
+                    'action_url' => generateNotificationSecureLink('student_registered', ['student_id' => $eleve_id]),
+                    'action_text' => getNotificationActionText('student_registered')
+                ]);
+                
+                // Notification pour le professeur principal de la classe (si assigné)
+                $prof_query = "SELECT e.id, u.id as user_id 
+                               FROM classes c 
+                               JOIN enseignants e ON c.professeur_principal_id = e.id 
+                               JOIN utilisateurs u ON e.utilisateur_id = u.id 
+                               WHERE c.id = :classe_id";
+                $stmt = $db->prepare($prof_query);
+                $stmt->execute(['classe_id' => $data['classe_id']]);
+                $prof_info = $stmt->fetch();
+                
+                if ($prof_info) {
+                    $prof_notification = new NotificationManager($prof_info['user_id'], $_SESSION['ecole_id']);
+                    $prof_notification->createNotificationFromTemplate('student_registered', [
+                        'student_name' => $data['prenom'] . ' ' . $data['nom'],
+                        'class_name' => $classe_info['nom_classe'],
+                        'matricule' => $matricule,
+                        'niveau' => $classe_info['niveau'],
+                        'cycle' => $classe_info['cycle'],
+                        'student_id' => $eleve_id
+                    ], [
+                        'priority' => 'normal',
+                        'channels' => ['web', 'email'],
+                        'action_url' => generateNotificationSecureLink('student_registered', ['student_id' => $eleve_id]),
+                        'action_text' => getNotificationActionText('student_registered')
+                    ]);
+                }
+                
+            } catch (Exception $e) {
+                error_log("Erreur création notification élève: " . $e->getMessage());
+                // Ne pas faire échouer l'inscription pour une erreur de notification
+            }
+            
             setFlashMessage('success', "Inscription réussie ! L'élève {$data['prenom']} {$data['nom']} a été inscrit avec succès. Matricule: $matricule");
             
             // Rediriger vers la page de confirmation avec génération de carte

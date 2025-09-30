@@ -43,14 +43,14 @@ $where_clause = implode(' AND ', $where_conditions);
 
 // Compter le total d'élèves - REQUÊTE CORRIGÉE
 $count_query = "SELECT COUNT(DISTINCT e.id) as total 
-                FROM eleves e 
+                  FROM eleves e
                 LEFT JOIN (
                     SELECT eleve_id, classe_id, annee_scolaire, statut_inscription
                     FROM inscriptions 
                     WHERE statut_inscription IN ('validée', 'en_cours')
                     ORDER BY created_at DESC
                 ) i ON e.id = i.eleve_id
-                LEFT JOIN classes c ON i.classe_id = c.id
+                  LEFT JOIN classes c ON i.classe_id = c.id
                 WHERE $where_clause";
 
 $count_stmt = $db->prepare($count_query);
@@ -78,8 +78,8 @@ $query = "SELECT DISTINCT e.*,
           GROUP BY e.id
           ORDER BY e.nom, e.prenom
           LIMIT :limit OFFSET :offset";
-
-$stmt = $db->prepare($query);
+        
+        $stmt = $db->prepare($query);
 foreach ($params as $key => $value) {
     $stmt->bindValue($key, $value);
 }
@@ -118,13 +118,13 @@ $page_title = "Gestion des Élèves";
         <header class="topbar">
             <button class="sidebar-toggle d-lg-none" type="button">
                 <i class="bi bi-list"></i>
-            </button>
+                </button>
             
             <div class="topbar-title">
                 <h1><i class="bi bi-people me-2"></i><?php echo $page_title; ?></h1>
                 <p class="text-muted">Gérer les élèves et leurs inscriptions</p>
-            </div>
-            
+    </div>
+
             <div class="topbar-actions">
                 <a href="add.php" class="btn btn-primary">
                     <i class="bi bi-person-plus-fill me-2"></i>Inscrire un Élève
@@ -141,8 +141,8 @@ $page_title = "Gestion des Élèves";
                         <li><a class="dropdown-item" href="export_csv.php"><i class="bi bi-file-earmark-text me-2"></i>CSV (tous les élèves)</a></li>
                         <li><a class="dropdown-item" href="export.php?format=pdf"><i class="bi bi-file-earmark-pdf me-2"></i>PDF</a></li>
                     </ul>
+                    </div>
                 </div>
-            </div>
         </header>
         
         <!-- Contenu -->
@@ -153,11 +153,11 @@ $page_title = "Gestion des Élèves";
                     <div class="stat-card">
                         <div class="stat-icon bg-primary">
                             <i class="bi bi-people"></i>
-                        </div>
+                    </div>
                         <div class="stat-content">
                             <h3><?php echo number_format($total_students); ?></h3>
                             <p>Total élèves</p>
-                        </div>
+                </div>
                     </div>
                 </div>
                 
@@ -165,9 +165,9 @@ $page_title = "Gestion des Élèves";
                     <div class="stat-card">
                         <div class="stat-icon bg-success">
                             <i class="bi bi-person-check"></i>
-                        </div>
+                </div>
                         <div class="stat-content">
-                            <?php
+            <?php 
                             $inscrits_query = "SELECT COUNT(*) as total FROM eleves WHERE ecole_id = :ecole_id AND statut_scolaire = 'inscrit'";
                             $inscrits_stmt = $db->prepare($inscrits_query);
                             $inscrits_stmt->execute(['ecole_id' => $_SESSION['ecole_id']]);
@@ -175,10 +175,10 @@ $page_title = "Gestion des Élèves";
                             ?>
                             <h3><?php echo number_format($total_inscrits); ?></h3>
                             <p>Élèves inscrits</p>
-                        </div>
-                    </div>
                 </div>
-                
+                    </div>
+                    </div>
+                    
                 <div class="col-md-3">
                     <div class="stat-card">
                         <div class="stat-icon bg-info">
@@ -193,17 +193,17 @@ $page_title = "Gestion des Élèves";
                             ?>
                             <h3><?php echo number_format($total_nouveaux); ?></h3>
                             <p>Nouveaux (30j)</p>
-                        </div>
+                                </div>
                     </div>
                 </div>
-                
+
                 <div class="col-md-3">
                     <div class="stat-card">
                         <div class="stat-icon bg-warning">
                             <i class="bi bi-exclamation-triangle"></i>
                         </div>
                         <div class="stat-content">
-                            <?php
+                <?php 
                             $problemes_query = "SELECT COUNT(*) as total FROM eleves WHERE ecole_id = :ecole_id AND statut_scolaire IN ('suspendu', 'exclu')";
                             $problemes_stmt = $db->prepare($problemes_query);
                             $problemes_stmt->execute(['ecole_id' => $_SESSION['ecole_id']]);
@@ -211,10 +211,10 @@ $page_title = "Gestion des Élèves";
                             ?>
                             <h3><?php echo number_format($total_problemes); ?></h3>
                             <p>Problèmes</p>
-                        </div>
                     </div>
-                </div>
-            </div>
+                                </div>
+                                </div>
+                            </div>
             
             <!-- Filtres et recherche -->
             <div class="card mb-4">
@@ -226,7 +226,7 @@ $page_title = "Gestion des Élèves";
                                 <span class="input-group-text"><i class="bi bi-search"></i></span>
                                 <input type="text" class="form-control" id="search" name="search" 
                                        placeholder="Nom, prénom ou matricule..." value="<?php echo htmlspecialchars($search); ?>">
-                            </div>
+                        </div>
                         </div>
                         
                         <div class="col-md-3">
@@ -237,9 +237,9 @@ $page_title = "Gestion des Élèves";
                                     <option value="<?php echo $classe['id']; ?>" <?php echo ($classe_filter == $classe['id']) ? 'selected' : ''; ?>>
                                         <?php echo htmlspecialchars($classe['niveau'] . ' - ' . $classe['nom_classe']); ?>
                                     </option>
-                                <?php endforeach; ?>
+                        <?php endforeach; ?>
                             </select>
-                        </div>
+                    </div>
                         
                         <div class="col-md-3">
                             <label for="statut" class="form-label">Statut</label>
@@ -251,20 +251,20 @@ $page_title = "Gestion des Élèves";
                                 <option value="diplômé" <?php echo ($statut_filter == 'diplômé') ? 'selected' : ''; ?>>Diplômé</option>
                                 <option value="abandonné" <?php echo ($statut_filter == 'abandonné') ? 'selected' : ''; ?>>Abandonné</option>
                             </select>
-                        </div>
-                        
+                </div>
+                
                         <div class="col-md-2">
                             <label class="form-label">&nbsp;</label>
                             <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-outline-primary">
                                     <i class="bi bi-funnel me-2"></i>Filtrer
                                 </button>
-                            </div>
-                        </div>
-                    </form>
+                    </div>
                 </div>
+                    </form>
             </div>
-            
+    </div>
+
             <!-- Liste des élèves -->
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -282,9 +282,9 @@ $page_title = "Gestion des Élèves";
                         <button type="button" class="btn btn-outline-danger" id="deleteSelected" disabled>
                             <i class="bi bi-trash"></i>
                         </button>
-                    </div>
-                </div>
-                
+                        </div>
+                            </div>
+                            
                 <div class="card-body p-0">
                     <?php if (empty($students)): ?>
                         <div class="text-center p-5">
@@ -294,7 +294,7 @@ $page_title = "Gestion des Élèves";
                             <a href="add.php" class="btn btn-primary">
                                 <i class="bi bi-person-plus-fill me-2"></i>Inscrire le Premier Élève
                             </a>
-                        </div>
+                                </div>
                     <?php else: ?>
                         <div class="table-responsive">
                             <table class="table table-hover mb-0">
@@ -327,9 +327,9 @@ $page_title = "Gestion des Élèves";
                                                         <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center" 
                                                              style="width: 40px; height: 40px;">
                                                             <i class="bi bi-person text-white"></i>
-                                                        </div>
+                            </div>
                                                     <?php endif; ?>
-                                                </div>
+                        </div>
                                             </td>
                                             <td>
                                                 <span class="badge bg-light text-dark font-monospace">
@@ -342,7 +342,7 @@ $page_title = "Gestion des Élèves";
                                                     <?php if (!empty($student['postnom'])): ?>
                                                         <br><small class="text-muted"><?php echo htmlspecialchars($student['postnom']); ?></small>
                                                     <?php endif; ?>
-                                                </div>
+                        </div>
                                             </td>
                                             <td>
                                                 <span class="badge <?php echo $student['sexe'] == 'M' ? 'bg-primary' : 'bg-pink'; ?>">
@@ -417,16 +417,16 @@ $page_title = "Gestion des Élèves";
                                                             onclick="deleteStudent(<?php echo $student['id']; ?>)" title="Supprimer">
                                                         <i class="bi bi-trash"></i>
                                                     </button>
-                                                </div>
+                        </div>
                                             </td>
                                         </tr>
-                                    <?php endforeach; ?>
+                <?php endforeach; ?>
                                 </tbody>
                             </table>
-                        </div>
+            </div>
                     <?php endif; ?>
-                </div>
-                
+    </div>
+
                 <?php if ($total_pages > 1): ?>
                 <div class="card-footer">
                     <nav aria-label="Navigation des pages">

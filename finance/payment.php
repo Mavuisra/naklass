@@ -164,6 +164,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Log de l'action
             logUserAction('CREATE_PAYMENT', "Nouveau paiement: $numero_recu - {$eleve['nom']} {$eleve['prenom']} - " . formatAmount($montant_total, $monnaie));
             
+            // 🔔 NOTIFICATION: Paiement reçu
+            try {
+                require_once '../includes/NotificationManager.php';
+                $notificationManager = new NotificationManager();
+                
+                // Notification pour l'administrateur/caissier qui a enregistré le paiement
+                require_once '../includes/notification_links.php';
+                $notificationManager->createNotificationFromTemplate('payment_received', [
+                    'student_name' => $eleve['prenom'] . ' ' . $eleve['nom'],
+                    'amount' => formatAmount($montant_total, $monnaie),
+                    'payment_type' => ucfirst($mode_paiement),
+                    'receipt_number' => $numero_recu,
+                    'matricule' => $eleve['matricule'],
+                    'payment_id' => $paiement_id
+                ], [
+                    'priority' => 'normal',
+                    'channels' => ['web'],
+                    'action_url' => generateNotificationSecureLink('payment_received', ['payment_id' => $paiement_id]),
+                    'action_text' => getNotificationActionText('payment_received')
+                ]);
+                
+                // Notification pour le professeur principal de l'élève (si assigné)
+                $prof_query = "SELECT e.id, u.id as user_id 
+                               FROM inscriptions i
+                               JOIN classes c ON i.classe_id = c.id
+                               JOIN enseignants e ON c.professeur_principal_id = e.id 
+                               JOIN utilisateurs u ON e.utilisateur_id = u.id 
+                               WHERE i.eleve_id = :eleve_id AND i.statut = 'actif'";
+                $stmt = $db->prepare($prof_query);
+                $stmt->execute(['eleve_id' => $eleve_id]);
+                $prof_info = $stmt->fetch();
+                
+                if ($prof_info) {
+                    $prof_notification = new NotificationManager($prof_info['user_id'], $_SESSION['ecole_id']);
+                    $prof_notification->createNotificationFromTemplate('payment_received', [
+                        'student_name' => $eleve['prenom'] . ' ' . $eleve['nom'],
+                        'amount' => formatAmount($montant_total, $monnaie),
+                        'payment_type' => ucfirst($mode_paiement),
+                        'receipt_number' => $numero_recu,
+                        'matricule' => $eleve['matricule'],
+                        'student_id' => $eleve_id
+                    ], [
+                        'priority' => 'normal',
+                        'channels' => ['web'],
+                        'action_url' => generateNotificationSecureLink('student_registered', ['student_id' => $eleve_id]),
+                        'action_text' => getNotificationActionText('student_registered')
+                    ]);
+                }
+                
+            } catch (Exception $e) {
+                error_log("Erreur création notification paiement: " . $e->getMessage());
+                // Ne pas faire échouer le paiement pour une erreur de notification
+            }
+            
             setFlashMessage('success', "Paiement enregistré avec succès ! Numéro de reçu: $numero_recu");
             
             // Rediriger vers l'impression du reçu

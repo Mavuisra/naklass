@@ -180,6 +180,84 @@ $page_title = "Tableau de Bord";
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="../assets/css/dashboard.css" rel="stylesheet">
     <link href="../assets/css/common.css" rel="stylesheet">
+    
+    <!-- Styles pour les notifications (modal uniquement) -->
+    <style>
+        /* Styles pour les notifications (modal uniquement) */
+        .badge {
+            font-size: 0.75rem;
+        }
+        
+        /* Animation pour les nouvelles notifications */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Styles spécifiques pour le modal */
+        .modal-notification-item {
+            transition: all 0.3s ease;
+            border-radius: 8px;
+        }
+        
+        .modal-notification-item:hover {
+            background-color: #f8f9fa !important;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .modal-notification-icon-circle {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background-color: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        
+        .modal-notification-title {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.95rem;
+        }
+        
+        .modal-notification-message {
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+        
+        .modal-notification-actions {
+            display: flex;
+            gap: 0.3rem;
+            flex-shrink: 0;
+        }
+        
+        .modal-notifications-list .border-bottom:last-child {
+            border-bottom: none !important;
+        }
+        
+        /* Animation pour les nouvelles notifications dans le modal */
+        .modal-notification-item.bg-light {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Responsive pour le modal */
+        @media (max-width: 576px) {
+            .modal-notification-actions {
+                flex-direction: column;
+                gap: 0.2rem;
+            }
+            
+            .modal-notification-actions .btn {
+                font-size: 0.75rem;
+                padding: 0.25rem 0.5rem;
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation latérale -->
@@ -323,6 +401,29 @@ $page_title = "Tableau de Bord";
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             <?php endforeach; ?>
+            
+            <!-- Données pour le Modal de Notifications -->
+            <?php
+            // Récupérer les notifications réelles du système pour le modal uniquement
+            try {
+                require_once '../includes/NotificationManager.php';
+                $notificationManager = new NotificationManager();
+                
+                // Récupérer les dernières notifications (limitées à 5) pour le modal
+                $recent_notifications = $notificationManager->getUserNotifications(null, [
+                    'limit' => 5,
+                    'unread_only' => false
+                ]);
+                
+                // Récupérer le nombre de notifications non lues
+                $unread_count = $notificationManager->getUnreadCount();
+                
+            } catch (Exception $e) {
+                $recent_notifications = [];
+                $unread_count = 0;
+                error_log("Erreur récupération notifications dashboard: " . $e->getMessage());
+            }
+            ?>
             
             <!-- Cartes de statistiques -->
             <div class="row g-4 mb-4">
@@ -696,36 +797,128 @@ $page_title = "Tableau de Bord";
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="notification-item">
-                        <i class="bi bi-exclamation-circle text-warning"></i>
-                        <div>
-                            <strong>Retards de paiement</strong>
-                            <p class="mb-0"><?php echo $stats['eleves_retard']; ?> élèves en retard de paiement</p>
-                            <small class="text-muted">Il y a 2 heures</small>
+                    <?php if (empty($recent_notifications)): ?>
+                        <div class="text-center py-4">
+                            <i class="bi bi-bell-slash text-muted" style="font-size: 3rem;"></i>
+                            <h6 class="text-muted mt-3">Aucune notification</h6>
+                            <p class="text-muted mb-0">Vous n'avez aucune notification pour le moment.</p>
                         </div>
-                    </div>
-                    
-                    <div class="notification-item">
-                        <i class="bi bi-person-plus text-success"></i>
-                        <div>
-                            <strong>Nouvelles inscriptions</strong>
-                            <p class="mb-0"><?php echo $stats['nouvelles_inscriptions']; ?> nouvelles inscriptions cette semaine</p>
-                            <small class="text-muted">Il y a 1 jour</small>
+                    <?php else: ?>
+                        <div class="modal-notifications-list">
+                            <?php foreach ($recent_notifications as $notification): ?>
+                                <div class="modal-notification-item d-flex align-items-start p-3 border-bottom <?php echo $notification['status'] === 'unread' ? 'bg-light' : ''; ?>" 
+                                     data-notification-id="<?php echo $notification['id']; ?>">
+                                    <div class="modal-notification-icon me-3">
+                                        <?php
+                                        $icon_class = 'bi-bell';
+                                        $icon_color = 'text-primary';
+                                        
+                                        switch ($notification['category']) {
+                                            case 'academic':
+                                                $icon_class = 'bi-book';
+                                                $icon_color = 'text-success';
+                                                break;
+                                            case 'financial':
+                                                $icon_class = 'bi-currency-dollar';
+                                                $icon_color = 'text-warning';
+                                                break;
+                                            case 'user':
+                                                $icon_class = 'bi-person';
+                                                $icon_color = 'text-info';
+                                                break;
+                                            case 'school':
+                                                $icon_class = 'bi-building';
+                                                $icon_color = 'text-secondary';
+                                                break;
+                                            case 'alert':
+                                                $icon_class = 'bi-exclamation-triangle';
+                                                $icon_color = 'text-danger';
+                                                break;
+                                            case 'security':
+                                                $icon_class = 'bi-shield-lock';
+                                                $icon_color = 'text-danger';
+                                                break;
+                                            case 'system':
+                                                $icon_class = 'bi-gear';
+                                                $icon_color = 'text-dark';
+                                                break;
+                                        }
+                                        
+                                        // Couleur selon la priorité
+                                        if ($notification['priority'] === 'urgent') {
+                                            $icon_color = 'text-danger';
+                                        } elseif ($notification['priority'] === 'high') {
+                                            $icon_color = 'text-warning';
+                                        }
+                                        ?>
+                                        <div class="modal-notification-icon-circle">
+                                            <i class="bi <?php echo $icon_class; ?> <?php echo $icon_color; ?>"></i>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="modal-notification-content flex-grow-1">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="modal-notification-title mb-1">
+                                                    <?php echo htmlspecialchars($notification['title']); ?>
+                                                    <?php if ($notification['status'] === 'unread'): ?>
+                                                        <span class="badge bg-primary ms-2">Nouveau</span>
+                                                    <?php endif; ?>
+                                                    <?php if ($notification['priority'] === 'urgent'): ?>
+                                                        <span class="badge bg-danger ms-1">Urgent</span>
+                                                    <?php elseif ($notification['priority'] === 'high'): ?>
+                                                        <span class="badge bg-warning ms-1">Important</span>
+                                                    <?php endif; ?>
+                                                </h6>
+                                                <p class="modal-notification-message text-muted mb-2">
+                                                    <?php echo htmlspecialchars($notification['message']); ?>
+                                                </p>
+                                                <small class="text-muted">
+                                                    <i class="bi bi-clock me-1"></i>
+                                                    <?php echo formatDateTime($notification['created_at'], 'd/m/Y H:i'); ?>
+                                                </small>
+                                            </div>
+                                            
+                                            <div class="modal-notification-actions">
+                                                <?php if ($notification['action_url']): ?>
+                                                    <a href="<?php echo htmlspecialchars($notification['action_url']); ?>" 
+                                                       class="btn btn-sm btn-outline-primary me-2"
+                                                       onclick="markAsReadModal(<?php echo $notification['id']; ?>)">
+                                                        <?php echo htmlspecialchars($notification['action_text'] ?: 'Voir'); ?>
+                                                    </a>
+                                                <?php endif; ?>
+                                                
+                                                <?php if ($notification['status'] === 'unread'): ?>
+                                                    <button class="btn btn-sm btn-outline-success me-1" 
+                                                            onclick="markAsReadModal(<?php echo $notification['id']; ?>)"
+                                                            title="Marquer comme lu">
+                                                        <i class="bi bi-check"></i>
+                                                    </button>
+                                                <?php endif; ?>
+                                                
+                                                <button class="btn btn-sm btn-outline-danger" 
+                                                        onclick="deleteNotificationModal(<?php echo $notification['id']; ?>)"
+                                                        title="Supprimer">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
-                    </div>
-                    
-                    <div class="notification-item">
-                        <i class="bi bi-calendar-check text-info"></i>
-                        <div>
-                            <strong>Fin de trimestre</strong>
-                            <p class="mb-0">Le trimestre se termine dans 15 jours</p>
-                            <small class="text-muted">Il y a 3 jours</small>
-                        </div>
-                    </div>
+                    <?php endif; ?>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                    <button type="button" class="btn btn-primary">Marquer comme lues</button>
+                    <?php if ($unread_count > 0): ?>
+                        <button type="button" class="btn btn-success" onclick="markAllAsReadModal()">
+                            <i class="bi bi-check-all me-1"></i>Marquer tout lu
+                        </button>
+                    <?php endif; ?>
+                    <a href="../notifications.php" class="btn btn-primary">
+                        <i class="bi bi-list me-1"></i>Voir toutes
+                    </a>
                 </div>
             </div>
         </div>
@@ -807,6 +1000,154 @@ $page_title = "Tableau de Bord";
             alert('Impression du reçu ' + paiementId + ' à implémenter');
         }
         
+        // Fonctions pour gérer les notifications (modal uniquement)
+        
+        function updateNotificationCount() {
+            fetch('../ajax/get_notification_count.php')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mettre à jour le badge dans le header
+                    const badge = document.querySelector('.topbar-actions .badge');
+                    if (badge) {
+                        if (data.count > 0) {
+                            badge.textContent = data.count;
+                            badge.style.display = 'inline';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    }
+                    
+                    // Mettre à jour le badge dans la section notifications
+                    const notificationBadge = document.querySelector('.card-header .badge');
+                    if (notificationBadge) {
+                        if (data.count > 0) {
+                            notificationBadge.textContent = data.count;
+                            notificationBadge.style.display = 'inline';
+                        } else {
+                            notificationBadge.style.display = 'none';
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+            });
+        }
+        
+        // Fonctions spécifiques pour le modal
+        function markAsReadModal(notificationId) {
+            fetch('../ajax/mark_notification_read.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    notification_id: notificationId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mettre à jour l'interface du modal
+                    const notificationItem = document.querySelector(`[data-notification-id="${notificationId}"]`);
+                    if (notificationItem) {
+                        notificationItem.classList.remove('bg-light');
+                        
+                        // Supprimer le badge "Nouveau"
+                        const badge = notificationItem.querySelector('.badge.bg-primary');
+                        if (badge) {
+                            badge.remove();
+                        }
+                        
+                        // Changer le bouton "Marquer comme lu" en "Lu"
+                        const markButton = notificationItem.querySelector('button[onclick*="markAsReadModal"]');
+                        if (markButton) {
+                            markButton.innerHTML = '<i class="bi bi-check-circle"></i>';
+                            markButton.classList.remove('btn-outline-success');
+                            markButton.classList.add('btn-outline-secondary');
+                            markButton.title = 'Lu';
+                        }
+                    }
+                    
+                    // Mettre à jour le compteur global
+                    updateNotificationCount();
+                } else {
+                    console.error('Erreur:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+            });
+        }
+        
+        function markAllAsReadModal() {
+            fetch('../ajax/mark_all_notifications_read.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Recharger la page pour mettre à jour l'interface
+                    location.reload();
+                } else {
+                    console.error('Erreur:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+            });
+        }
+        
+        function deleteNotificationModal(notificationId) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer cette notification ?')) {
+                fetch('../ajax/delete_notification.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        notification_id: notificationId
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Supprimer l'élément de l'interface du modal
+                        const notificationItem = document.querySelector(`[data-notification-id="${notificationId}"]`);
+                        if (notificationItem) {
+                            notificationItem.remove();
+                        }
+                        
+                        // Mettre à jour le compteur global
+                        updateNotificationCount();
+                        
+                        // Vérifier s'il reste des notifications dans le modal
+                        const remainingNotifications = document.querySelectorAll('.modal-notification-item');
+                        if (remainingNotifications.length === 0) {
+                            // Afficher le message "Aucune notification"
+                            const modalBody = document.querySelector('#notificationsModal .modal-body');
+                            modalBody.innerHTML = `
+                                <div class="text-center py-4">
+                                    <i class="bi bi-bell-slash text-muted" style="font-size: 3rem;"></i>
+                                    <h6 class="text-muted mt-3">Aucune notification</h6>
+                                    <p class="text-muted mb-0">Vous n'avez aucune notification pour le moment.</p>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        console.error('Erreur:', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                });
+            }
+        }
+        
         // Initialiser les filtres avec la date du jour
         document.addEventListener('DOMContentLoaded', function() {
             const today = new Date();
@@ -814,6 +1155,9 @@ $page_title = "Tableau de Bord";
             
             document.getElementById('filter_date_debut').value = firstDay.toISOString().split('T')[0];
             document.getElementById('filter_date_fin').value = today.toISOString().split('T')[0];
+            
+            // Mettre à jour le compteur de notifications au chargement
+            updateNotificationCount();
         });
     </script>
 </body>

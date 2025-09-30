@@ -192,6 +192,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Log de l'action
             logUserAction('CREATE_CLASS', "Création de la classe: {$data['nom_classe']} (ID: $classe_id)");
             
+            // 🔔 NOTIFICATION: Nouvelle classe créée
+            try {
+                require_once '../includes/NotificationManager.php';
+                $notificationManager = new NotificationManager();
+                
+                // Notification pour l'administrateur qui a créé la classe
+                require_once '../includes/notification_links.php';
+                $notificationManager->createNotificationFromTemplate('course_assigned', [
+                    'class_name' => $data['nom_classe'],
+                    'cycle_complet' => $cycle_complet,
+                    'professeur_name' => $data['professeur_principal_id'] ? 'Professeur assigné' : 'Aucun professeur assigné',
+                    'capacite_max' => $data['capacite_max'],
+                    'salle_classe' => $data['salle_classe'] ?: 'Non spécifiée',
+                    'class_id' => $classe_id
+                ], [
+                    'priority' => 'normal',
+                    'channels' => ['web'],
+                    'action_url' => generateNotificationSecureLink('course_assigned', ['class_id' => $classe_id]),
+                    'action_text' => getNotificationActionText('course_assigned')
+                ]);
+                
+                // Notification pour le professeur principal si assigné
+                if ($data['professeur_principal_id']) {
+                    $prof_notification = new NotificationManager(null, $_SESSION['ecole_id']);
+                    $prof_notification->createNotificationFromTemplate('teacher_assigned', [
+                        'teacher_name' => 'Vous',
+                        'class_name' => $data['nom_classe'],
+                        'cycle_complet' => $cycle_complet,
+                        'capacite_max' => $data['capacite_max'],
+                        'class_id' => $classe_id
+                    ], [
+                        'priority' => 'normal',
+                        'channels' => ['web', 'email'],
+                        'action_url' => generateNotificationSecureLink('teacher_assigned', ['class_id' => $classe_id]),
+                        'action_text' => getNotificationActionText('teacher_assigned')
+                    ]);
+                }
+                
+            } catch (Exception $e) {
+                error_log("Erreur création notification classe: " . $e->getMessage());
+                // Ne pas faire échouer la création de classe pour une erreur de notification
+            }
+            
             setFlashMessage('success', "La classe '{$data['nom_classe']}' a été créée avec succès.");
             redirect(createSecureLink('view.php', $classe_id, 'id'));
             

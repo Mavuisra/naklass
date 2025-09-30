@@ -184,7 +184,20 @@ if (isset($_SESSION['ecole_id'])) {
             </a>
         </li>
         <?php endif; ?>
+        
+        <!-- Lien vers les notifications pour tous les utilisateurs -->
+        <li class="menu-item <?php echo ($current_page == 'notifications.php') ? 'active' : ''; ?>">
+            <a href="../notifications.php" class="menu-link">
+                <i class="bi bi-bell"></i>
+                <span>Notifications</span>
+            </a>
+        </li>
     </ul>
+    
+    <!-- Widget de Notifications -->
+    <div class="sidebar-notifications">
+        <?php include 'notification_widget.php'; ?>
+    </div>
     
     <div class="sidebar-footer">
         <div class="user-profile-section">
